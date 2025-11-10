@@ -1,12 +1,21 @@
 import { useEffect, useRef, useState } from 'react'
-import { Application, Container } from 'pixi.js'
+import { Application, Container, Assets } from 'pixi.js'
 import { createIsometricGrid } from './isometricGrid'
+import { createTiledBackground } from './createTiledBackground'
 
 function App() {
   const divRef = useRef<HTMLDivElement>(null)
   const appRef = useRef<Application | null>(null)
   const worldRef = useRef<Container | null>(null)
   const [hmrTrigger, setHmrTrigger] = useState(0)
+
+  // Adjust this constant to tighten or loosen tile spacing
+  // Positive values = tighter spacing, Negative values = more gap
+  const TILE_OVERLAP = 10 // Adjust as needed
+
+  // Adjust these to align grid with tiles
+  const GRID_OFFSET_X = 16 // Adjust as needed
+  const GRID_OFFSET_Y = -40 // Adjust as needed
 
   // Initialize PixiJS app once
   useEffect(() => {
@@ -115,12 +124,31 @@ function App() {
       world.removeChildren()
     }
 
-    // Create and add new grid
-    const grid = createIsometricGrid()
-    world.addChild(grid)
-    console.log('Grid updated. Graphics bounds:', grid.getBounds())
-    console.log('World children count:', world.children.length)
-  }, [hmrTrigger, createIsometricGrid])
+    // Load texture and create background
+    const setupWorld = async () => {
+      try {
+        // Load the grass tile texture
+        const texture = await Assets.load('/tiles/grass_center_E.png')
+
+        // Create tiled background
+        const background = await createTiledBackground(texture, TILE_OVERLAP)
+
+        // Add background first (so it's behind the grid)
+        world.addChild(background)
+
+        // Create and add grid on top
+        const grid = createIsometricGrid(GRID_OFFSET_X, GRID_OFFSET_Y)
+        world.addChild(grid)
+
+        console.log('Grid updated. Graphics bounds:', grid.getBounds())
+        console.log('World children count:', world.children.length)
+      } catch (error) {
+        console.error('Failed to load grass texture:', error)
+      }
+    }
+
+    setupWorld()
+  }, [hmrTrigger, createIsometricGrid, TILE_OVERLAP, GRID_OFFSET_X, GRID_OFFSET_Y])
 
   return <div ref={divRef} style={{ width: '100vw', height: '100vh', overflow: 'hidden' }} />
 }

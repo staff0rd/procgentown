@@ -1,6 +1,6 @@
 import { Graphics } from 'pixi.js'
 
-export function createIsometricGrid() {
+export function createIsometricGrid(offsetX: number = 0, offsetY: number = 0) {
   const graphics = new Graphics()
   const gridSize = 100
   const numLines = 50
@@ -22,8 +22,8 @@ export function createIsometricGrid() {
     const y2 = offset * sinAngle + extent * cosAngle
 
     graphics
-      .moveTo(y1, x1)
-      .lineTo(y2, x2)
+      .moveTo(y1 + offsetX, x1 + offsetY)
+      .lineTo(y2 + offsetX, x2 + offsetY)
       .stroke({ width: 1, color: 0x4a5568 })
 
     // Left-going diagonal lines (negative slope)
@@ -33,8 +33,8 @@ export function createIsometricGrid() {
     const y4 = -offset * sinAngle + extent * cosAngle
 
     graphics
-      .moveTo(y3, x3)
-      .lineTo(y4, x4)
+      .moveTo(y3 + offsetX, x3 + offsetY)
+      .lineTo(y4 + offsetX, x4 + offsetY)
       .stroke({ width: 1, color: 0x4a5568 })
   }
 
