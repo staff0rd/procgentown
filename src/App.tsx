@@ -127,11 +127,12 @@ function App() {
     // Load texture and create background
     const setupWorld = async () => {
       try {
-        // Load the grass tile texture
-        const texture = await Assets.load('/tiles/grass_center_E.png')
+        // Load both grass and water tile textures
+        const grassTexture = await Assets.load('/tiles/grass_center_E.png')
+        const waterTexture = await Assets.load('/tiles/water_center_E.png')
 
-        // Create tiled background
-        const background = await createTiledBackground(texture, TILE_OVERLAP)
+        // Create tiled background with noise-based terrain
+        const background = await createTiledBackground(grassTexture, waterTexture, TILE_OVERLAP)
 
         // Add background first (so it's behind the grid)
         world.addChild(background)
@@ -143,7 +144,7 @@ function App() {
         console.log('Grid updated. Graphics bounds:', grid.getBounds())
         console.log('World children count:', world.children.length)
       } catch (error) {
-        console.error('Failed to load grass texture:', error)
+        console.error('Failed to load textures:', error)
       }
     }
 
