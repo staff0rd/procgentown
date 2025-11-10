@@ -9,7 +9,7 @@ export function createIsometricGrid(offsetX: number = 0, offsetY: number = 0) {
   const isoStepX = (tileContentWidth - tileOverlap) / 2  // = 111.5
   const isoStepY = (tileContentWidth - tileOverlap) / 4  // = 55.75
 
-  const numLines = 50
+  const numLines = 500 // Large grid for infinite world feel
 
   // Draw grid lines using the same isometric projection as the tiles
   // Tiles use: x = (col - row) * isoStepX, y = (col + row) * isoStepY

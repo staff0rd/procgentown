@@ -1,12 +1,13 @@
 import { useEffect, useRef, useState } from 'react'
 import { Application, Container, Assets } from 'pixi.js'
 import { createIsometricGrid } from './isometricGrid'
-import { createTiledBackground } from './createTiledBackground'
+import { ChunkManager } from './ChunkManager'
 
 function App() {
   const divRef = useRef<HTMLDivElement>(null)
   const appRef = useRef<Application | null>(null)
   const worldRef = useRef<Container | null>(null)
+  const chunkManagerRef = useRef<ChunkManager | null>(null)
   const [hmrTrigger, setHmrTrigger] = useState(0)
 
   // Adjust this constant to tighten or loosen tile spacing
@@ -20,6 +21,27 @@ function App() {
   // Zoom constraints
   const MIN_ZOOM = 0.25 // Maximum zoom out
   const MAX_ZOOM = 1.0 // Maximum zoom in (current view)
+
+  // Helper function to update visible chunks
+  const updateChunks = () => {
+    const app = appRef.current
+    const world = worldRef.current
+    const chunkManager = chunkManagerRef.current
+
+    if (!app || !world || !chunkManager) return
+
+    // Calculate viewport center in world space
+    const viewportCenterX = -world.x / world.scale.x
+    const viewportCenterY = -world.y / world.scale.y
+
+    chunkManager.updateVisibleChunks(
+      viewportCenterX,
+      viewportCenterY,
+      window.innerWidth,
+      window.innerHeight,
+      world.scale.x
+    )
+  }
 
   // Initialize PixiJS app once
   useEffect(() => {
@@ -74,6 +96,9 @@ function App() {
           world.y += deltaY
 
           lastPointerPosition = { x: e.global.x, y: e.global.y }
+
+          // Update chunks after panning
+          updateChunks()
         })
 
         app.stage.on('pointerup', () => {
@@ -120,11 +145,16 @@ function App() {
           // Adjust world position to keep zoom centered on mouse
           world.x += (worldPosAfterX - worldPosBeforeX) * world.scale.x
           world.y += (worldPosAfterY - worldPosBeforeY) * world.scale.y
+
+          // Update chunks after zooming
+          updateChunks()
         })
 
         const handleResize = () => {
           if (app && app.renderer) {
             app.renderer.resize(window.innerWidth, window.innerHeight)
+            // Update chunks after resize
+            updateChunks()
           }
         }
 
@@ -135,6 +165,10 @@ function App() {
 
         return () => {
           window.removeEventListener('resize', handleResize)
+          if (chunkManagerRef.current) {
+            chunkManagerRef.current.destroy()
+            chunkManagerRef.current = null
+          }
           if (app && app.renderer) {
             app.destroy(true)
           }
@@ -169,21 +203,34 @@ function App() {
     // Load texture and create background
     const setupWorld = async () => {
       try {
+        // Clean up old chunk manager if it exists
+        if (chunkManagerRef.current) {
+          chunkManagerRef.current.destroy()
+          chunkManagerRef.current = null
+        }
+
         // Load both grass and water tile textures
         const grassTexture = await Assets.load('/tiles/grass_center_E.png')
         const waterTexture = await Assets.load('/tiles/water_center_E.png')
 
-        // Create tiled background with noise-based terrain
-        const background = await createTiledBackground(grassTexture, waterTexture, TILE_OVERLAP)
+        // Create chunk manager for infinite world
+        const chunkManager = new ChunkManager(
+          world,
+          grassTexture,
+          waterTexture,
+          TILE_OVERLAP,
+          'procgentown'
+        )
+        chunkManagerRef.current = chunkManager
 
-        // Add background first (so it's behind the grid)
-        world.addChild(background)
+        // Load initial chunks
+        updateChunks()
 
         // Create and add grid on top
         const grid = createIsometricGrid(GRID_OFFSET_X, GRID_OFFSET_Y)
         world.addChild(grid)
 
-        console.log('Grid updated. Graphics bounds:', grid.getBounds())
+        console.log('Chunk-based infinite world created')
         console.log('World children count:', world.children.length)
       } catch (error) {
         console.error('Failed to load textures:', error)
@@ -191,7 +238,7 @@ function App() {
     }
 
     setupWorld()
-  }, [hmrTrigger, createIsometricGrid, TILE_OVERLAP, GRID_OFFSET_X, GRID_OFFSET_Y])
+  }, [hmrTrigger, TILE_OVERLAP, GRID_OFFSET_X, GRID_OFFSET_Y, updateChunks])
 
   return <div ref={divRef} style={{ width: '100vw', height: '100vh', overflow: 'hidden' }} />
 }
