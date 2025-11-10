@@ -1,15 +1,17 @@
-import { useEffect, useRef } from 'react'
-import { Application, Graphics, Container } from 'pixi.js'
+import { useEffect, useRef, useState } from 'react'
+import { Application, Container } from 'pixi.js'
+import { createIsometricGrid } from './isometricGrid'
 
 function App() {
   const divRef = useRef<HTMLDivElement>(null)
   const appRef = useRef<Application | null>(null)
+  const worldRef = useRef<Container | null>(null)
+  const [hmrTrigger, setHmrTrigger] = useState(0)
 
+  // Initialize PixiJS app once
   useEffect(() => {
     if (!divRef.current) return
 
-    let isInitialized = false
-    let world: Container
     let isDragging = false
     let lastPointerPosition = { x: 0, y: 0 }
 
@@ -23,9 +25,7 @@ function App() {
           backgroundColor: 0x2c3e50
         })
 
-        // Only set the ref after successful initialization
         appRef.current = app
-        isInitialized = true
 
         // Clear the div and add canvas
         if (divRef.current) {
@@ -34,35 +34,13 @@ function App() {
         }
 
         // Create world container
-        world = new Container()
+        const world = new Container()
         world.x = window.innerWidth / 2
         world.y = window.innerHeight / 2
+        worldRef.current = world
         app.stage.addChild(world)
 
-        // Create grid with modern Graphics API
-        const graphics = new Graphics()
-        const gridSize = 100
-        const numLines = 50
-
-        console.log('Drawing grid with', numLines, 'lines at', gridSize, 'spacing')
         console.log('World position:', world.x, world.y)
-
-        // Draw each line individually
-        for (let i = -numLines; i <= numLines; i++) {
-          // Vertical lines
-          graphics.moveTo(i * gridSize, -numLines * gridSize)
-          graphics.lineTo(i * gridSize, numLines * gridSize)
-          graphics.stroke({ width: 1, color: 0x34495e })
-
-          // Horizontal lines
-          graphics.moveTo(-numLines * gridSize, i * gridSize)
-          graphics.lineTo(numLines * gridSize, i * gridSize)
-          graphics.stroke({ width: 1, color: 0x34495e })
-        }
-
-        world.addChild(graphics)
-        console.log('Graphics added to world. Graphics bounds:', graphics.getBounds())
-        console.log('World children count:', world.children.length)
 
         // Setup interaction
         app.stage.eventMode = 'static'
@@ -101,6 +79,9 @@ function App() {
 
         window.addEventListener('resize', handleResize)
 
+        // Trigger grid creation after init
+        setHmrTrigger(prev => prev + 1)
+
         return () => {
           window.removeEventListener('resize', handleResize)
           if (app && app.renderer) {
@@ -119,9 +100,27 @@ function App() {
       cleanup.then(fn => {
         if (fn) fn()
         appRef.current = null
+        worldRef.current = null
       })
     }
   }, [])
+
+  // Separate effect for grid that re-runs on HMR
+  useEffect(() => {
+    const world = worldRef.current
+    if (!world) return
+
+    // Remove old grid if it exists
+    if (world.children.length > 0) {
+      world.removeChildren()
+    }
+
+    // Create and add new grid
+    const grid = createIsometricGrid()
+    world.addChild(grid)
+    console.log('Grid updated. Graphics bounds:', grid.getBounds())
+    console.log('World children count:', world.children.length)
+  }, [hmrTrigger, createIsometricGrid])
 
   return <div ref={divRef} style={{ width: '100vw', height: '100vh', overflow: 'hidden' }} />
 }
