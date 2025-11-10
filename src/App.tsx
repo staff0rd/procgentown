@@ -17,6 +17,10 @@ function App() {
   const GRID_OFFSET_X = 16 // Adjust as needed
   const GRID_OFFSET_Y = -40 // Adjust as needed
 
+  // Zoom constraints
+  const MIN_ZOOM = 0.25 // Maximum zoom out
+  const MAX_ZOOM = 1.0 // Maximum zoom in (current view)
+
   // Initialize PixiJS app once
   useEffect(() => {
     if (!divRef.current) return
@@ -78,6 +82,44 @@ function App() {
 
         app.stage.on('pointerupoutside', () => {
           isDragging = false
+        })
+
+        // Scroll wheel zoom
+        app.stage.on('wheel', (e) => {
+          const event = e as unknown as WheelEvent
+          event.preventDefault()
+
+          // Calculate zoom direction and amount
+          const zoomIntensity = 0.1
+          const direction = event.deltaY > 0 ? -1 : 1 // Scroll down = zoom out, scroll up = zoom in
+          const zoomFactor = 1 + direction * zoomIntensity
+
+          // Calculate new zoom level
+          const currentZoom = world.scale.x
+          let newZoom = currentZoom * zoomFactor
+
+          // Clamp zoom to min/max values
+          newZoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, newZoom))
+
+          // If zoom hasn't changed (hit limits), return early
+          if (newZoom === currentZoom) return
+
+          // Get mouse position in world coordinates before zoom
+          const mouseX = event.clientX
+          const mouseY = event.clientY
+          const worldPosBeforeX = (mouseX - world.x) / world.scale.x
+          const worldPosBeforeY = (mouseY - world.y) / world.scale.y
+
+          // Apply zoom
+          world.scale.set(newZoom, newZoom)
+
+          // Get mouse position in world coordinates after zoom
+          const worldPosAfterX = (mouseX - world.x) / world.scale.x
+          const worldPosAfterY = (mouseY - world.y) / world.scale.y
+
+          // Adjust world position to keep zoom centered on mouse
+          world.x += (worldPosAfterX - worldPosBeforeX) * world.scale.x
+          world.y += (worldPosAfterY - worldPosBeforeY) * world.scale.y
         })
 
         const handleResize = () => {
