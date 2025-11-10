@@ -1,14 +1,12 @@
 import { Container, Sprite, Texture } from 'pixi.js'
-import { createNoise2D } from 'simplex-noise'
-import type { NoiseFunction2D } from 'simplex-noise'
-import Rand from 'rand-seed'
+import { TerrainGenerator } from './TerrainGenerator'
 
 export class ChunkManager {
   private chunks: Map<string, Sprite[]> = new Map()
   private tilesContainer: Container
   private grassTexture: Texture
   private waterTexture: Texture
-  private noise2D: NoiseFunction2D
+  private terrainGenerator: TerrainGenerator
 
   // Constants matching the original tile system
   private readonly tileContentWidth = 233
@@ -16,10 +14,6 @@ export class ChunkManager {
   private readonly isoStepY: number
   private readonly CHUNK_SIZE = 16 // 16x16 tiles per chunk
   private readonly RENDER_DISTANCE = 2 // Load chunks within 2 chunks of viewport
-
-  // Noise parameters
-  private readonly noiseScale = 0.1
-  private readonly waterThreshold = 0.2
 
   constructor(
     worldContainer: Container,
@@ -40,9 +34,8 @@ export class ChunkManager {
     this.isoStepX = (this.tileContentWidth - tileOverlap) / 2
     this.isoStepY = (this.tileContentWidth - tileOverlap) / 4
 
-    // Create noise generator with fixed seed for consistency
-    const rand = new Rand(seed)
-    this.noise2D = createNoise2D(() => rand.next())
+    // Create terrain generator with fixed seed for consistency
+    this.terrainGenerator = new TerrainGenerator(seed)
   }
 
   /**
@@ -50,6 +43,9 @@ export class ChunkManager {
    */
   private generateChunk(chunkX: number, chunkY: number): Sprite[] {
     const sprites: Sprite[] = []
+
+    // Generate terrain types for this chunk
+    const waterMap = this.terrainGenerator.generateChunkTerrain(chunkX, chunkY, this.CHUNK_SIZE)
 
     // Generate tiles for this chunk
     const startCol = chunkX * this.CHUNK_SIZE
@@ -59,12 +55,9 @@ export class ChunkManager {
 
     for (let row = startRow; row < endRow; row++) {
       for (let col = startCol; col < endCol; col++) {
-        // Get noise value for this position
-        const noiseValue = this.noise2D(col * this.noiseScale, row * this.noiseScale)
-        const normalizedNoise = (noiseValue + 1) / 2
-
-        // Determine tile type
-        const isWater = normalizedNoise < this.waterThreshold
+        // Look up tile type from water map
+        const key = `${col},${row}`
+        const isWater = waterMap.get(key) || false
         const sprite = new Sprite(isWater ? this.waterTexture : this.grassTexture)
 
         // Position in isometric space
