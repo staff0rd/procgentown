@@ -2,39 +2,48 @@ import { Graphics } from 'pixi.js'
 
 export function createIsometricGrid(offsetX: number = 0, offsetY: number = 0) {
   const graphics = new Graphics()
-  const gridSize = 100
+
+  // Match the exact tile spacing from createTiledBackground.ts
+  const tileContentWidth = 233
+  const tileOverlap = 10
+  const isoStepX = (tileContentWidth - tileOverlap) / 2  // = 111.5
+  const isoStepY = (tileContentWidth - tileOverlap) / 4  // = 55.75
+
   const numLines = 50
 
-  // Isometric angles: 26.565 degrees (atan(0.5))
-  const isoAngle = Math.atan(0.5)
-  const cosAngle = Math.cos(isoAngle)
-  const sinAngle = Math.sin(isoAngle)
-
-  // Draw isometric grid lines (rotated 90 degrees - swap x and y)
+  // Draw grid lines using the same isometric projection as the tiles
+  // Tiles use: x = (col - row) * isoStepX, y = (col + row) * isoStepY
   for (let i = -numLines; i <= numLines; i++) {
-    const offset = i * gridSize
-    const extent = numLines * gridSize
+    // Lines going in the "col" direction (slope = isoStepY / isoStepX = 0.5)
+    // These are lines where row is constant
+    const row = i
+    const startCol = -numLines
+    const endCol = numLines
 
-    // Right-going diagonal lines (positive slope)
-    const x1 = offset * cosAngle - (-extent) * sinAngle
-    const y1 = offset * sinAngle + (-extent) * cosAngle
-    const x2 = offset * cosAngle - extent * sinAngle
-    const y2 = offset * sinAngle + extent * cosAngle
+    const x1 = (startCol - row) * isoStepX
+    const y1 = (startCol + row) * isoStepY
+    const x2 = (endCol - row) * isoStepX
+    const y2 = (endCol + row) * isoStepY
 
     graphics
-      .moveTo(y1 + offsetX, x1 + offsetY)
-      .lineTo(y2 + offsetX, x2 + offsetY)
+      .moveTo(x1 + offsetX, y1 + offsetY)
+      .lineTo(x2 + offsetX, y2 + offsetY)
       .stroke({ width: 1, color: 0x4a5568 })
 
-    // Left-going diagonal lines (negative slope)
-    const x3 = offset * cosAngle + (-extent) * sinAngle
-    const y3 = -offset * sinAngle + (-extent) * cosAngle
-    const x4 = offset * cosAngle + extent * sinAngle
-    const y4 = -offset * sinAngle + extent * cosAngle
+    // Lines going in the "row" direction (slope = -isoStepY / isoStepX = -0.5)
+    // These are lines where col is constant
+    const col = i
+    const startRow = -numLines
+    const endRow = numLines
+
+    const x3 = (col - startRow) * isoStepX
+    const y3 = (col + startRow) * isoStepY
+    const x4 = (col - endRow) * isoStepX
+    const y4 = (col + endRow) * isoStepY
 
     graphics
-      .moveTo(y3 + offsetX, x3 + offsetY)
-      .lineTo(y4 + offsetX, x4 + offsetY)
+      .moveTo(x3 + offsetX, y3 + offsetY)
+      .lineTo(x4 + offsetX, y4 + offsetY)
       .stroke({ width: 1, color: 0x4a5568 })
   }
 
