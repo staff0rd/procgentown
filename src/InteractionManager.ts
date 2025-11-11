@@ -17,7 +17,9 @@ export class InteractionManager {
   private callbacks: InteractionCallbacks
   private isDragging = false
   private lastPointerPosition = { x: 0, y: 0 }
-  private keyPressHandler: ((e: KeyboardEvent) => void) | null = null
+  private keyDownHandler: ((e: KeyboardEvent) => void) | null = null
+  private keyUpHandler: ((e: KeyboardEvent) => void) | null = null
+  private keysPressed = new Set<string>()
 
   constructor(app: Application, world: Container, callbacks: InteractionCallbacks = {}) {
     this.app = app
@@ -115,30 +117,52 @@ export class InteractionManager {
   }
 
   private setupKeyboardControls(): void {
-    this.keyPressHandler = (e: KeyboardEvent) => {
-      if (e.key === 's' || e.key === 'S') {
+    this.keyDownHandler = (e: KeyboardEvent) => {
+      const key = e.key.toLowerCase()
+
+      // Only trigger if this key wasn't already pressed
+      if (this.keysPressed.has(key)) {
+        return
+      }
+
+      this.keysPressed.add(key)
+
+      if (key === 's') {
         if (this.callbacks.onToggleSmoothing) {
           this.callbacks.onToggleSmoothing()
         }
-      } else if (e.key === 'g' || e.key === 'G') {
+      } else if (key === 'g') {
         if (this.callbacks.onToggleGrid) {
           this.callbacks.onToggleGrid()
         }
-      } else if (e.key === 't' || e.key === 'T') {
+      } else if (key === 't') {
         if (this.callbacks.onToggleTiles) {
           this.callbacks.onToggleTiles()
         }
       }
     }
 
-    window.addEventListener('keypress', this.keyPressHandler)
+    this.keyUpHandler = (e: KeyboardEvent) => {
+      const key = e.key.toLowerCase()
+      this.keysPressed.delete(key)
+    }
+
+    window.addEventListener('keydown', this.keyDownHandler)
+    window.addEventListener('keyup', this.keyUpHandler)
   }
 
   destroy(): void {
-    if (this.keyPressHandler) {
-      window.removeEventListener('keypress', this.keyPressHandler)
-      this.keyPressHandler = null
+    if (this.keyDownHandler) {
+      window.removeEventListener('keydown', this.keyDownHandler)
+      this.keyDownHandler = null
     }
+
+    if (this.keyUpHandler) {
+      window.removeEventListener('keyup', this.keyUpHandler)
+      this.keyUpHandler = null
+    }
+
+    this.keysPressed.clear()
 
     // Remove all stage listeners
     this.app.stage.removeAllListeners()
