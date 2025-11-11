@@ -1,6 +1,24 @@
 import { createNoise2D } from 'simplex-noise'
 import type { NoiseFunction2D } from 'simplex-noise'
 import Rand from 'rand-seed'
+import { MapData } from './MapData'
+
+export type TileVariant =
+  | 'water'
+  | 'grass'
+  | 'grass_water_N'
+  | 'grass_water_E'
+  | 'grass_water_S'
+  | 'grass_water_W'
+  | 'grass_waterConcave_N'
+  | 'grass_waterConcave_E'
+  | 'grass_waterConcave_S'
+  | 'grass_waterConcave_W'
+
+export interface ChunkTerrainResult {
+  mapData: MapData
+  tileVariants: Map<string, TileVariant>
+}
 
 /**
  * Handles procedural terrain generation with cluster filtering
@@ -13,10 +31,34 @@ export class TerrainGenerator {
   private readonly waterThreshold = 0.2
   private readonly minWaterClusterSize = 4 // Minimum 2x2 cluster
 
+  // Smoothing toggle
+  private smoothingEnabled: boolean = true
+
   constructor(seed: string = 'procgentown') {
     // Create noise generator with fixed seed for consistency
     const rand = new Rand(seed)
     this.noise2D = createNoise2D(() => rand.next())
+  }
+
+  /**
+   * Toggle smoothing on/off for water tiles
+   */
+  public toggleSmoothing(): void {
+    this.smoothingEnabled = !this.smoothingEnabled
+  }
+
+  /**
+   * Get the current smoothing state
+   */
+  public isSmoothing(): boolean {
+    return this.smoothingEnabled
+  }
+
+  /**
+   * Set smoothing state
+   */
+  public setSmoothing(enabled: boolean): void {
+    this.smoothingEnabled = enabled
   }
 
   /**
@@ -122,21 +164,177 @@ export class TerrainGenerator {
   }
 
   /**
+   * Get the tile variant for a water tile based on its neighbors
+   * Uses isometric directions: N = top-right, E = bottom-right, S = bottom-left, W = top-left
+   */
+  private getWaterTileVariant(
+    col: number,
+    row: number,
+    waterMap: Map<string, boolean>
+  ): TileVariant {
+    // Debug logging for tile 2,3
+    if (col === 2 && row === 3) {
+      console.log(`=== Checking tile ${col},${row} ===`)
+    }
+
+    // Check if this is a water tile
+    const key = `${col},${row}`
+    if (!waterMap.get(key)) {
+      if (col === 2 && row === 3) console.log('  -> GRASS (not water in map)')
+      return 'grass'
+    }
+
+    // If smoothing is disabled, return plain water for all water tiles
+    if (!this.smoothingEnabled) {
+      if (col === 2 && row === 3) console.log('  -> WATER (smoothing disabled)')
+      return 'water'
+    }
+
+    // Check neighbors in isometric directions
+    // N = top-right (col+1, row)
+    // E = bottom-right (col, row+1)
+    // S = bottom-left (col-1, row)
+    // W = top-left (col, row-1)
+    const hasWaterN = waterMap.get(`${col + 1},${row}`) || false
+    const hasWaterE = waterMap.get(`${col},${row + 1}`) || false
+    const hasWaterS = waterMap.get(`${col - 1},${row}`) || false
+    const hasWaterW = waterMap.get(`${col},${row - 1}`) || false
+
+    // Debug logging for tile 2,3
+    if (col === 2 && row === 3) {
+      console.log(`Tile ${col},${row}:`)
+      console.log(`  N (${col+1},${row}):`, hasWaterN)
+      console.log(`  E (${col},${row+1}):`, hasWaterE)
+      console.log(`  S (${col-1},${row}):`, hasWaterS)
+      console.log(`  W (${col},${row-1}):`, hasWaterW)
+    }
+
+    // Count water neighbors
+    const waterCount = [hasWaterN, hasWaterE, hasWaterS, hasWaterW].filter(Boolean).length
+
+    // If surrounded by water on all sides, it's full water
+    if (waterCount === 4) {
+      return 'water'
+    }
+
+    // Straight edges (3 sides water, 1 side grass)
+    // grass_water_E means grass on East, water on N, W, S
+    if (!hasWaterE && hasWaterN && hasWaterW && hasWaterS) {
+      return 'grass_water_E'
+    }
+    if (!hasWaterS && hasWaterE && hasWaterN && hasWaterW) {
+      return 'grass_water_S'
+    }
+    if (!hasWaterW && hasWaterE && hasWaterS && hasWaterN) {
+      return 'grass_water_W'
+    }
+    if (!hasWaterN && hasWaterE && hasWaterS && hasWaterW) {
+      return 'grass_water_N'
+    }
+
+    // Concave corners (2 adjacent sides water)
+    // The suffix indicates where the concave notch points (where grass curves in)
+    // grass_waterConcave_N: water on S+W, grass curves in from N
+    if (hasWaterS && hasWaterW && !hasWaterN && !hasWaterE) {
+      if (col === 2 && row === 3) console.log('  -> grass_waterConcave_N')
+      return 'grass_waterConcave_N'
+    }
+    // grass_waterConcave_E: water on N+W, grass curves in from E
+    if (hasWaterN && hasWaterW && !hasWaterE && !hasWaterS) {
+      if (col === 2 && row === 3) console.log('  -> grass_waterConcave_E')
+      return 'grass_waterConcave_E'
+    }
+    // grass_waterConcave_S: water on N+E, grass curves in from S
+    if (hasWaterN && hasWaterE && !hasWaterS && !hasWaterW) {
+      if (col === 2 && row === 3) console.log('  -> grass_waterConcave_S')
+      return 'grass_waterConcave_S'
+    }
+    // grass_waterConcave_W: water on S+E, grass curves in from W
+    if (hasWaterS && hasWaterE && !hasWaterW && !hasWaterN) {
+      if (col === 2 && row === 3) console.log('  -> grass_waterConcave_W')
+      return 'grass_waterConcave_W'
+    }
+
+    // Default to water for any other configuration
+    if (col === 2 && row === 3) console.log('  -> water (default)')
+    return 'water'
+  }
+
+  /**
    * Generate terrain types for a chunk region
-   * Returns a map with tile coordinates as keys and water boolean as values
+   * Returns both the logical map data and the rendering tile variants
    */
   public generateChunkTerrain(
     chunkX: number,
     chunkY: number,
     chunkSize: number
-  ): Map<string, boolean> {
-    const PADDING = 8 // Check tiles around the chunk to detect clusters at edges
+  ): ChunkTerrainResult {
+    const PADDING = 8
 
     const startCol = chunkX * chunkSize - PADDING
     const startRow = chunkY * chunkSize - PADDING
     const endCol = (chunkX + 1) * chunkSize + PADDING
     const endRow = (chunkY + 1) * chunkSize + PADDING
 
-    return this.generateWaterMap(startCol, startRow, endCol, endRow)
+    const waterMap = this.generateWaterMap(startCol, startRow, endCol, endRow)
+
+    const mapData = new MapData()
+    const tileVariants = new Map<string, TileVariant>()
+
+    for (let row = startRow; row < endRow; row++) {
+      for (let col = startCol; col < endCol; col++) {
+        const key = `${col},${row}`
+        const isWater = waterMap.get(key) || false
+
+        mapData.set(col, row, isWater ? 'water' : 'grass')
+
+        const variant = this.getWaterTileVariant(col, row, waterMap)
+        tileVariants.set(key, variant)
+
+        const logTileCol = 2
+        const logTileRow = 3
+        if (col === logTileCol && row === logTileRow) {
+          console.log(`Tile ${col},${row}: ${isWater ? 'WATER' : 'grass'} -> ${variant}`)
+          if (isWater) {
+            console.log(`  Neighbors: N(${col+1},${row})=${waterMap.get(`${col+1},${row}`)}, E(${col},${row+1})=${waterMap.get(`${col},${row+1}`)}, S(${col-1},${row})=${waterMap.get(`${col-1},${row}`)}, W(${col},${row-1})=${waterMap.get(`${col},${row-1}`)}`)
+          }
+        }
+      }
+    }
+
+    if (chunkX === 0 && chunkY === 0) {
+      console.log('\nMap grid (0,0 to 4,4):')
+      console.log('Note: This is in GRID coordinates (col, row)')
+      console.log('The isometric visual display may show different positions')
+      let header = '  '
+      for (let col = 0; col <= 4; col++) {
+        header += ` ${col}`
+      }
+      console.log(header)
+      for (let row = 0; row <= 4; row++) {
+        let line = `${row}:`
+        for (let col = 0; col <= 4; col++) {
+          const type = mapData.get(col, row)
+          line += type === 'water' ? ' W' : ' G'
+        }
+        console.log(line)
+      }
+      console.log('\nDetailed tile info (0,0 to 4,4):')
+      for (let row = 0; row <= 4; row++) {
+        for (let col = 0; col <= 4; col++) {
+          const type = mapData.get(col, row)
+          const variant = tileVariants.get(`${col},${row}`)
+          console.log(`(${col},${row}): map=${type}, render=${variant}`)
+        }
+      }
+      console.log('\nDiagonal check (0,0 -> 1,1 -> 2,2 -> 3,3 -> 4,4):')
+      for (let i = 0; i <= 4; i++) {
+        const type = mapData.get(i, i)
+        const variant = tileVariants.get(`${i},${i}`)
+        console.log(`(${i},${i}): map=${type}, render=${variant}`)
+      }
+    }
+
+    return { mapData, tileVariants }
   }
 }

@@ -1,12 +1,17 @@
-import { Container, Sprite, Texture } from 'pixi.js'
+import { Container, Sprite, Texture, Polygon } from 'pixi.js'
 import { TerrainGenerator } from './TerrainGenerator'
+import type { TileVariant } from './TerrainGenerator'
+import type { GridManager } from './GridManager'
 
 export class ChunkManager {
   private chunks: Map<string, Sprite[]> = new Map()
+  private chunkCoordinates: Map<string, Array<{ col: number; row: number }>> = new Map()
   private tilesContainer: Container
-  private grassTexture: Texture
-  private waterTexture: Texture
+  private overlaysContainer: Container
+  private tileTextures: Map<TileVariant, Texture> = new Map()
   private terrainGenerator: TerrainGenerator
+  private debugMode: boolean = false
+  private gridManager: GridManager | null = null
 
   // Constants matching the original tile system
   private readonly tileContentWidth = 233
@@ -14,21 +19,53 @@ export class ChunkManager {
   private readonly isoStepY: number
   private readonly CHUNK_SIZE = 16 // 16x16 tiles per chunk
   private readonly RENDER_DISTANCE = 2 // Load chunks within 2 chunks of viewport
+  private readonly GRID_OFFSET_X = 16
+  private readonly GRID_OFFSET_Y = -40
 
   constructor(
     worldContainer: Container,
     grassTexture: Texture,
     waterTexture: Texture,
+    edgeTextures: {
+      grass_water_N: Texture
+      grass_water_E: Texture
+      grass_water_S: Texture
+      grass_water_W: Texture
+      grass_waterConcave_N: Texture
+      grass_waterConcave_E: Texture
+      grass_waterConcave_S: Texture
+      grass_waterConcave_W: Texture
+    },
     tileOverlap: number,
-    seed: string = 'procgentown'
+    seed: string = 'procgentown',
+    debugMode: boolean = false
   ) {
-    this.grassTexture = grassTexture
-    this.waterTexture = waterTexture
+    this.debugMode = debugMode
+    // Store basic textures
+    this.tileTextures.set('grass', grassTexture)
+    this.tileTextures.set('water', waterTexture)
+
+    // Store all edge variant textures
+    this.tileTextures.set('grass_water_N', edgeTextures.grass_water_N)
+    this.tileTextures.set('grass_water_E', edgeTextures.grass_water_E)
+    this.tileTextures.set('grass_water_S', edgeTextures.grass_water_S)
+    this.tileTextures.set('grass_water_W', edgeTextures.grass_water_W)
+    this.tileTextures.set('grass_waterConcave_N', edgeTextures.grass_waterConcave_N)
+    this.tileTextures.set('grass_waterConcave_E', edgeTextures.grass_waterConcave_E)
+    this.tileTextures.set('grass_waterConcave_S', edgeTextures.grass_waterConcave_S)
+    this.tileTextures.set('grass_waterConcave_W', edgeTextures.grass_waterConcave_W)
 
     // Create a single container for all tiles with sorting enabled
     this.tilesContainer = new Container()
     this.tilesContainer.sortableChildren = true
     worldContainer.addChild(this.tilesContainer)
+    console.log('Created tilesContainer, children count:', worldContainer.children.length)
+
+    // Create a separate container for overlays (above tiles)
+    this.overlaysContainer = new Container()
+    this.overlaysContainer.sortableChildren = true
+    worldContainer.addChild(this.overlaysContainer)
+    console.log('Created overlaysContainer, children count:', worldContainer.children.length)
 
     // Calculate isometric steps using tile overlap
     this.isoStepX = (this.tileContentWidth - tileOverlap) / 2
@@ -39,15 +76,21 @@ export class ChunkManager {
   }
 
   /**
+   * Set the grid manager for coordinate display
+   */
+  setGridManager(gridManager: GridManager): void {
+    this.gridManager = gridManager
+  }
+
+  /**
    * Generate a chunk at the given chunk coordinates
    */
   private generateChunk(chunkX: number, chunkY: number): Sprite[] {
     const sprites: Sprite[] = []
+    const coordinates: Array<{ col: number; row: number }> = []
 
-    // Generate terrain types for this chunk
-    const waterMap = this.terrainGenerator.generateChunkTerrain(chunkX, chunkY, this.CHUNK_SIZE)
+    const { tileVariants } = this.terrainGenerator.generateChunkTerrain(chunkX, chunkY, this.CHUNK_SIZE)
 
-    // Generate tiles for this chunk
     const startCol = chunkX * this.CHUNK_SIZE
     const startRow = chunkY * this.CHUNK_SIZE
     const endCol = startCol + this.CHUNK_SIZE
@@ -55,10 +98,16 @@ export class ChunkManager {
 
     for (let row = startRow; row < endRow; row++) {
       for (let col = startCol; col < endCol; col++) {
-        // Look up tile type from water map
         const key = `${col},${row}`
-        const isWater = waterMap.get(key) || false
-        const sprite = new Sprite(isWater ? this.waterTexture : this.grassTexture)
+        const variant = tileVariants.get(key) || 'grass'
+        const texture = this.tileTextures.get(variant)
+
+        if (!texture) {
+          console.warn(`Missing texture for variant: ${variant}`)
+          continue
+        }
+
+        const sprite = new Sprite(texture)
 
         // Position in isometric space
         sprite.x = (col - row) * this.isoStepX
@@ -68,12 +117,56 @@ export class ChunkManager {
         // Tiles with smaller col+row should render behind (lower zIndex)
         sprite.zIndex = col + row
 
+        // Define diamond-shaped hit area that matches the grid lines exactly
+        // The center of tile (col, row) in world space with grid offset is:
+        //   x = (col - row) * isoStepX + GRID_OFFSET_X
+        //   y = (col + row) * isoStepY + GRID_OFFSET_Y
+        // The sprite is positioned at (col - row) * isoStepX, (col + row) * isoStepY
+        // So relative to sprite, the tile center is at (GRID_OFFSET_X, GRID_OFFSET_Y)
+        // The diamond extends ±isoStepX horizontally and ±isoStepY vertically from center
+
+        sprite.hitArea = new Polygon([
+          this.GRID_OFFSET_X, this.GRID_OFFSET_Y - this.isoStepY,           // Top point
+          this.GRID_OFFSET_X + this.isoStepX, this.GRID_OFFSET_Y,            // Right point
+          this.GRID_OFFSET_X, this.GRID_OFFSET_Y + this.isoStepY,            // Bottom point
+          this.GRID_OFFSET_X - this.isoStepX, this.GRID_OFFSET_Y             // Left point
+        ])
+
+        // Log on pointerover
+        sprite.on('pointerover', () => {
+          console.log(`Tile coordinate: (${col}, ${row})`)
+        })
+
         this.tilesContainer.addChild(sprite)
         sprites.push(sprite)
+
+        if (sprites.length === 1) {
+          console.log(`First sprite added to chunk ${chunkX},${chunkY}`)
+        }
+
+        // Add tile interaction to GridManager
+        if (this.gridManager) {
+          this.gridManager.addTileInteraction(sprite, col, row, this.debugMode)
+          coordinates.push({ col, row })
+        }
       }
     }
 
+    // Store coordinates for this chunk
+    if (coordinates.length > 0) {
+      const chunkKey = this.getChunkKey(chunkX, chunkY)
+      this.chunkCoordinates.set(chunkKey, coordinates)
+    }
+
     return sprites
+  }
+
+  /**
+   * Update debug text positions based on current world transform
+   */
+  public updateDebugTextPositions(): void {
+    if (!this.debugMode || !this.gridManager) return
+    this.gridManager.updateCoordinatePositions()
   }
 
   /**
@@ -170,8 +263,75 @@ export class ChunkManager {
           sprite.destroy()
         }
         this.chunks.delete(key)
+
+        // Clean up tile interactions for this chunk
+        if (this.chunkCoordinates.has(key)) {
+          const coordinates = this.chunkCoordinates.get(key)!
+          if (this.gridManager) {
+            for (const { col, row } of coordinates) {
+              this.gridManager.removeTileInteraction(col, row)
+            }
+          }
+          this.chunkCoordinates.delete(key)
+        }
       }
     }
+  }
+
+  /**
+   * Get the terrain generator instance
+   */
+  public getTerrainGenerator(): TerrainGenerator {
+    return this.terrainGenerator
+  }
+
+  /**
+   * Regenerate all visible chunks (useful after settings change)
+   */
+  public regenerateAllChunks(): void {
+    // Store current chunk keys
+    const chunkKeys = Array.from(this.chunks.keys())
+
+    // Destroy all existing chunks
+    for (const [key, sprites] of this.chunks.entries()) {
+      for (const sprite of sprites) {
+        this.tilesContainer.removeChild(sprite)
+        sprite.destroy()
+      }
+
+      // Clean up tile interactions
+      if (this.chunkCoordinates.has(key)) {
+        const coordinates = this.chunkCoordinates.get(key)!
+        if (this.gridManager) {
+          for (const { col, row } of coordinates) {
+            this.gridManager.removeTileInteraction(col, row)
+          }
+        }
+        this.chunkCoordinates.delete(key)
+      }
+    }
+    this.chunks.clear()
+
+    // Regenerate all chunks
+    for (const key of chunkKeys) {
+      const [chunkX, chunkY] = key.split(',').map(Number)
+      const sprites = this.generateChunk(chunkX, chunkY)
+      this.chunks.set(key, sprites)
+    }
+  }
+
+  /**
+   * Get the tiles container
+   */
+  public getTilesContainer(): Container {
+    return this.tilesContainer
+  }
+
+  /**
+   * Get the overlays container
+   */
+  public getOverlaysContainer(): Container {
+    return this.overlaysContainer
   }
 
   /**
@@ -184,6 +344,19 @@ export class ChunkManager {
       }
     }
     this.chunks.clear()
+
+    // Clean up all tile interactions
+    for (const [key] of this.chunkCoordinates.entries()) {
+      const coordinates = this.chunkCoordinates.get(key)!
+      if (this.gridManager) {
+        for (const { col, row } of coordinates) {
+          this.gridManager.removeTileInteraction(col, row)
+        }
+      }
+    }
+    this.chunkCoordinates.clear()
+
+    this.overlaysContainer.destroy({ children: true })
     this.tilesContainer.destroy({ children: true })
   }
 }
