@@ -26,14 +26,20 @@ export class HitboxOverlayManager {
 
   createOverlay(sprite: Sprite, col: number, row: number): void {
     const hitboxGraphics = new Graphics()
+
+    // Shift the center to match the visual tile diamond
+    const centerX = this.gridOffsetX
+    const centerY = this.gridOffsetY - this.isoStepY + 2 * this.isoStepY
+
     hitboxGraphics.poly([
-      this.gridOffsetX, this.gridOffsetY - this.isoStepY,
-      this.gridOffsetX + this.isoStepX, this.gridOffsetY,
-      this.gridOffsetX, this.gridOffsetY + this.isoStepY,
-      this.gridOffsetX - this.isoStepX, this.gridOffsetY
+      centerX, centerY - this.isoStepY,
+      centerX + this.isoStepX, centerY,
+      centerX, centerY + this.isoStepY,
+      centerX - this.isoStepX, centerY
     ])
     hitboxGraphics.fill({ color: 0xff0000, alpha: 0.3 })
     hitboxGraphics.visible = false
+
     hitboxGraphics.x = sprite.x
     hitboxGraphics.y = sprite.y
     hitboxGraphics.zIndex = sprite.zIndex + 0.5

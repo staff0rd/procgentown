@@ -117,19 +117,15 @@ export class ChunkManager {
         // Tiles with smaller col+row should render behind (lower zIndex)
         sprite.zIndex = col + row
 
-        // Define diamond-shaped hit area that matches the grid lines exactly
-        // The center of tile (col, row) in world space with grid offset is:
-        //   x = (col - row) * isoStepX + GRID_OFFSET_X
-        //   y = (col + row) * isoStepY + GRID_OFFSET_Y
-        // The sprite is positioned at (col - row) * isoStepX, (col + row) * isoStepY
-        // So relative to sprite, the tile center is at (GRID_OFFSET_X, GRID_OFFSET_Y)
-        // The diamond extends ±isoStepX horizontally and ±isoStepY vertically from center
+
+        const hitCenterX = this.GRID_OFFSET_X
+        const hitCenterY = this.GRID_OFFSET_Y - this.isoStepY + 2 * this.isoStepY
 
         sprite.hitArea = new Polygon([
-          this.GRID_OFFSET_X, this.GRID_OFFSET_Y - this.isoStepY,           // Top point
-          this.GRID_OFFSET_X + this.isoStepX, this.GRID_OFFSET_Y,            // Right point
-          this.GRID_OFFSET_X, this.GRID_OFFSET_Y + this.isoStepY,            // Bottom point
-          this.GRID_OFFSET_X - this.isoStepX, this.GRID_OFFSET_Y             // Left point
+          hitCenterX, hitCenterY - this.isoStepY,           // Top point
+          hitCenterX + this.isoStepX, hitCenterY,            // Right point
+          hitCenterX, hitCenterY + this.isoStepY,            // Bottom point
+          hitCenterX - this.isoStepX, hitCenterY             // Left point
         ])
 
         // Log on pointerover
