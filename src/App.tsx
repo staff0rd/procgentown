@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, useCallback } from 'react'
 import { Application, Container, Assets } from 'pixi.js'
 import { createIsometricGrid } from './isometricGrid'
 import { ChunkManager } from './ChunkManager'
@@ -23,7 +23,7 @@ function App() {
   const MAX_ZOOM = 1.0 // Maximum zoom in (current view)
 
   // Helper function to update visible chunks
-  const updateChunks = () => {
+  const updateChunks = useCallback(() => {
     const app = appRef.current
     const world = worldRef.current
     const chunkManager = chunkManagerRef.current
@@ -41,7 +41,7 @@ function App() {
       window.innerHeight,
       world.scale.x
     )
-  }
+  }, [])
 
   // Initialize PixiJS app once
   useEffect(() => {
@@ -49,8 +49,18 @@ function App() {
 
     let isDragging = false
     let lastPointerPosition = { x: 0, y: 0 }
+    let isInitializing = false
+    let isCancelled = false
 
     const initApp = async () => {
+      // Prevent multiple simultaneous initializations
+      if (isInitializing || appRef.current) {
+        console.log('App initialization already in progress or completed, skipping')
+        return () => {}
+      }
+
+      isInitializing = true
+
       try {
         const app = new Application()
 
@@ -59,6 +69,13 @@ function App() {
           height: window.innerHeight,
           backgroundColor: 0x2c3e50
         })
+
+        // Check if cleanup was called during initialization
+        if (isCancelled) {
+          console.log('Initialization was cancelled, cleaning up')
+          app.destroy(true)
+          return () => {}
+        }
 
         appRef.current = app
 
@@ -175,18 +192,32 @@ function App() {
         }
       } catch (error) {
         console.error('Failed to initialize PixiJS app:', error)
+        isInitializing = false
         return () => {} // Return empty cleanup function on error
+      } finally {
+        isInitializing = false
       }
     }
 
-    const cleanup = initApp()
+    initApp()
 
+    // Return cleanup function that runs synchronously
     return () => {
-      cleanup.then(fn => {
-        if (fn) fn()
+      isCancelled = true
+
+      // Clean up chunk manager immediately
+      if (chunkManagerRef.current) {
+        chunkManagerRef.current.destroy()
+        chunkManagerRef.current = null
+      }
+
+      // Clean up app immediately if it exists
+      if (appRef.current && appRef.current.renderer) {
+        appRef.current.destroy(true)
         appRef.current = null
-        worldRef.current = null
-      })
+      }
+
+      worldRef.current = null
     }
   }, [])
 
@@ -238,7 +269,7 @@ function App() {
     }
 
     setupWorld()
-  }, [hmrTrigger, TILE_OVERLAP, GRID_OFFSET_X, GRID_OFFSET_Y, updateChunks])
+  }, [hmrTrigger, TILE_OVERLAP, GRID_OFFSET_X, GRID_OFFSET_Y])
 
   return <div ref={divRef} style={{ width: '100vw', height: '100vh', overflow: 'hidden' }} />
 }
