@@ -274,6 +274,13 @@ export class GridManager {
   }
 
   /**
+   * Get the currently hovered tile coordinates
+   */
+  getCurrentHoveredTile(): string | null {
+    return this.hitboxOverlayManager.getCurrentHoveredTile()
+  }
+
+  /**
    * Update grid configuration and redraw
    */
   updateConfig(newConfig: Partial<GridConfig>): void {

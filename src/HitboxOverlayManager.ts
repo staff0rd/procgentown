@@ -122,6 +122,10 @@ export class HitboxOverlayManager {
     }
   }
 
+  getCurrentHoveredTile(): string | null {
+    return this.currentHoveredTile
+  }
+
   clear(): void {
     for (const [, overlay] of this.hitboxOverlays.entries()) {
       overlay.destroy()

@@ -89,6 +89,10 @@ function App() {
               const tilesState = chunkManager.areTilesVisible() ? 'ON' : 'OFF'
               console.log(`Tile visibility: ${tilesState}`)
             }
+          },
+          getCurrentTile: () => {
+            const gridManager = gridManagerRef.current
+            return gridManager ? gridManager.getCurrentHoveredTile() : null
           }
         })
 
