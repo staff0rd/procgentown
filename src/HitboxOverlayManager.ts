@@ -2,6 +2,7 @@ import { Graphics, Container, Sprite } from 'pixi.js'
 
 export class HitboxOverlayManager {
   private hitboxOverlays: Map<string, Graphics> = new Map()
+  private spriteMap: Map<string, Sprite> = new Map()
   private currentHoveredTile: string | null = null
   private container: Container
   private isoStepX: number
@@ -9,6 +10,7 @@ export class HitboxOverlayManager {
   private gridOffsetX: number
   private gridOffsetY: number
   private isGridVisible: boolean = false
+  private lastLoggedTile: string | null = null
 
   constructor(
     container: Container,
@@ -25,6 +27,8 @@ export class HitboxOverlayManager {
   }
 
   createOverlay(sprite: Sprite, col: number, row: number): void {
+    const tileKey = `${col},${row}`
+
     const hitboxGraphics = new Graphics()
 
     // Shift the center to match the visual tile diamond
@@ -45,32 +49,56 @@ export class HitboxOverlayManager {
     hitboxGraphics.zIndex = sprite.zIndex + 0.5
     this.container.addChild(hitboxGraphics)
 
-    const tileKey = `${col},${row}`
     this.hitboxOverlays.set(tileKey, hitboxGraphics)
+    this.spriteMap.set(tileKey, sprite)
 
     sprite.eventMode = 'static'
     sprite.cursor = 'pointer'
 
     sprite.on('pointerover', () => {
-      if (this.currentHoveredTile && this.currentHoveredTile !== tileKey) {
-        const prevOverlay = this.hitboxOverlays.get(this.currentHoveredTile)
-        if (prevOverlay) {
-          prevOverlay.visible = false
-        }
-      }
-
-      if (this.isGridVisible) {
-        hitboxGraphics.visible = true
-      }
-      this.currentHoveredTile = tileKey
+      this.showOverlay(tileKey)
     })
 
     sprite.on('pointerout', () => {
-      hitboxGraphics.visible = false
-      if (this.currentHoveredTile === tileKey) {
-        this.currentHoveredTile = null
-      }
+      this.hideOverlay(tileKey)
     })
+  }
+
+  private showOverlay(tileKey: string): void {
+    // Hide previous overlay
+    if (this.currentHoveredTile && this.currentHoveredTile !== tileKey) {
+      const prevOverlay = this.hitboxOverlays.get(this.currentHoveredTile)
+      if (prevOverlay) {
+        prevOverlay.visible = false
+      }
+    }
+
+    // Show new overlay
+    if (this.isGridVisible) {
+      const overlay = this.hitboxOverlays.get(tileKey)
+      if (overlay) {
+        overlay.visible = true
+      }
+    }
+
+    // Log only when tile changes
+    if (this.lastLoggedTile !== tileKey) {
+      console.log(`Tile coordinate: ${tileKey}`)
+      this.lastLoggedTile = tileKey
+    }
+
+    this.currentHoveredTile = tileKey
+  }
+
+  private hideOverlay(tileKey: string): void {
+    const overlay = this.hitboxOverlays.get(tileKey)
+    if (overlay) {
+      overlay.visible = false
+    }
+    if (this.currentHoveredTile === tileKey) {
+      this.currentHoveredTile = null
+      this.lastLoggedTile = null
+    }
   }
 
   removeOverlay(col: number, row: number): void {
@@ -81,6 +109,7 @@ export class HitboxOverlayManager {
       overlay.destroy()
       this.hitboxOverlays.delete(tileKey)
     }
+    this.spriteMap.delete(tileKey)
   }
 
   setGridVisible(visible: boolean): void {
@@ -98,6 +127,7 @@ export class HitboxOverlayManager {
       overlay.destroy()
     }
     this.hitboxOverlays.clear()
+    this.spriteMap.clear()
     this.currentHoveredTile = null
   }
 }

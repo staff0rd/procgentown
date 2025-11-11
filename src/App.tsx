@@ -85,9 +85,8 @@ function App() {
           onToggleTiles: () => {
             const chunkManager = chunkManagerRef.current
             if (chunkManager) {
-              const tilesContainer = chunkManager.getTilesContainer()
-              tilesContainer.visible = !tilesContainer.visible
-              const tilesState = tilesContainer.visible ? 'ON' : 'OFF'
+              chunkManager.toggleTileVisibility()
+              const tilesState = chunkManager.areTilesVisible() ? 'ON' : 'OFF'
               console.log(`Tile visibility: ${tilesState}`)
             }
           }

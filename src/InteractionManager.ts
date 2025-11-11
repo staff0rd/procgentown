@@ -20,6 +20,7 @@ export class InteractionManager {
   private keyDownHandler: ((e: KeyboardEvent) => void) | null = null
   private keyUpHandler: ((e: KeyboardEvent) => void) | null = null
   private keysPressed = new Set<string>()
+  private viewportChangeThrottleId: number | null = null
 
   constructor(app: Application, world: Container, callbacks: InteractionCallbacks = {}) {
     this.app = app
@@ -34,6 +35,22 @@ export class InteractionManager {
     this.setupPanControls()
     this.setupZoomControls()
     this.setupKeyboardControls()
+  }
+
+  /**
+   * Throttled viewport change notification
+   */
+  private notifyViewportChange(): void {
+    if (this.viewportChangeThrottleId !== null) {
+      return
+    }
+
+    this.viewportChangeThrottleId = window.requestAnimationFrame(() => {
+      this.viewportChangeThrottleId = null
+      if (this.callbacks.onViewportChange) {
+        this.callbacks.onViewportChange()
+      }
+    })
   }
 
   private setupPanControls(): void {
@@ -58,10 +75,8 @@ export class InteractionManager {
 
       this.lastPointerPosition = { x: e.global.x, y: e.global.y }
 
-      // Notify viewport change
-      if (this.callbacks.onViewportChange) {
-        this.callbacks.onViewportChange()
-      }
+      // Notify viewport change (throttled)
+      this.notifyViewportChange()
     })
 
     stage.on('pointerup', () => {
@@ -109,10 +124,8 @@ export class InteractionManager {
       this.world.x += (worldPosAfterX - worldPosBeforeX) * this.world.scale.x
       this.world.y += (worldPosAfterY - worldPosBeforeY) * this.world.scale.y
 
-      // Notify viewport change
-      if (this.callbacks.onViewportChange) {
-        this.callbacks.onViewportChange()
-      }
+      // Notify viewport change (throttled)
+      this.notifyViewportChange()
     })
   }
 
@@ -163,6 +176,12 @@ export class InteractionManager {
     }
 
     this.keysPressed.clear()
+
+    // Cancel pending viewport change notification
+    if (this.viewportChangeThrottleId !== null) {
+      window.cancelAnimationFrame(this.viewportChangeThrottleId)
+      this.viewportChangeThrottleId = null
+    }
 
     // Remove all stage listeners
     this.app.stage.removeAllListeners()

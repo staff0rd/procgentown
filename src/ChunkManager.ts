@@ -12,6 +12,7 @@ export class ChunkManager {
   private terrainGenerator: TerrainGenerator
   private debugMode: boolean = false
   private gridManager: GridManager | null = null
+  private tilesVisible: boolean = true
 
   // Constants matching the original tile system
   private readonly tileContentWidth = 233
@@ -117,6 +118,9 @@ export class ChunkManager {
         // Tiles with smaller col+row should render behind (lower zIndex)
         sprite.zIndex = col + row
 
+        // Set initial alpha based on tile visibility
+        sprite.alpha = this.tilesVisible ? 1 : 0
+
 
         const hitCenterX = this.GRID_OFFSET_X
         const hitCenterY = this.GRID_OFFSET_Y - this.isoStepY + 2 * this.isoStepY
@@ -127,11 +131,6 @@ export class ChunkManager {
           hitCenterX, hitCenterY + this.isoStepY,            // Bottom point
           hitCenterX - this.isoStepX, hitCenterY             // Left point
         ])
-
-        // Log on pointerover
-        sprite.on('pointerover', () => {
-          console.log(`Tile coordinate: (${col}, ${row})`)
-        })
 
         this.tilesContainer.addChild(sprite)
         sprites.push(sprite)
@@ -321,6 +320,27 @@ export class ChunkManager {
    */
   public getTilesContainer(): Container {
     return this.tilesContainer
+  }
+
+  /**
+   * Toggle tile visibility (uses alpha to keep sprites interactive)
+   */
+  public toggleTileVisibility(): void {
+    this.tilesVisible = !this.tilesVisible
+    const targetAlpha = this.tilesVisible ? 1 : 0
+
+    for (const sprites of this.chunks.values()) {
+      for (const sprite of sprites) {
+        sprite.alpha = targetAlpha
+      }
+    }
+  }
+
+  /**
+   * Check if tiles are visible
+   */
+  public areTilesVisible(): boolean {
+    return this.tilesVisible
   }
 
   /**
