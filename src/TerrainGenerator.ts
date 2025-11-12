@@ -172,21 +172,15 @@ export class TerrainGenerator {
     row: number,
     waterMap: Map<string, boolean>
   ): TileVariant {
-    // Debug logging for tile 2,3
-    if (col === 2 && row === 3) {
-      console.log(`=== Checking tile ${col},${row} ===`)
-    }
 
     // Check if this is a water tile
     const key = `${col},${row}`
     if (!waterMap.get(key)) {
-      if (col === 2 && row === 3) console.log('  -> GRASS (not water in map)')
       return 'grass'
     }
 
     // If smoothing is disabled, return plain water for all water tiles
     if (!this.smoothingEnabled) {
-      if (col === 2 && row === 3) console.log('  -> WATER (smoothing disabled)')
       return 'water'
     }
 
@@ -199,15 +193,6 @@ export class TerrainGenerator {
     const hasWaterE = waterMap.get(`${col},${row + 1}`) || false
     const hasWaterS = waterMap.get(`${col - 1},${row}`) || false
     const hasWaterW = waterMap.get(`${col},${row - 1}`) || false
-
-    // Debug logging for tile 2,3
-    if (col === 2 && row === 3) {
-      console.log(`Tile ${col},${row}:`)
-      console.log(`  N (${col+1},${row}):`, hasWaterN)
-      console.log(`  E (${col},${row+1}):`, hasWaterE)
-      console.log(`  S (${col-1},${row}):`, hasWaterS)
-      console.log(`  W (${col},${row-1}):`, hasWaterW)
-    }
 
     // Count water neighbors
     const waterCount = [hasWaterN, hasWaterE, hasWaterS, hasWaterW].filter(Boolean).length
@@ -236,17 +221,14 @@ export class TerrainGenerator {
     // The suffix indicates where the concave notch points (where grass curves in)
     // grass_waterConcave_N: water on S+W, grass curves in from N
     if (hasWaterS && hasWaterW && !hasWaterN && !hasWaterE) {
-      if (col === 2 && row === 3) console.log('  -> grass_waterConcave_N')
       return 'grass_waterConcave_N'
     }
     // grass_waterConcave_E: water on N+W, grass curves in from E
     if (hasWaterN && hasWaterW && !hasWaterE && !hasWaterS) {
-      if (col === 2 && row === 3) console.log('  -> grass_waterConcave_E')
       return 'grass_waterConcave_E'
     }
     // grass_waterConcave_S: water on N+E, grass curves in from S
     if (hasWaterN && hasWaterE && !hasWaterS && !hasWaterW) {
-      if (col === 2 && row === 3) console.log('  -> grass_waterConcave_S')
       return 'grass_waterConcave_S'
     }
     // grass_waterConcave_W: water on S+E, grass curves in from W

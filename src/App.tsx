@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
-import { Assets } from 'pixi.js'
 import { ChunkManager } from './ChunkManager'
 import { GridManager } from './GridManager'
 import { PixiAppManager } from './PixiAppManager'
 import { InteractionManager } from './InteractionManager'
 import { TILE_OVERLAP, GRID_OFFSET_X, GRID_OFFSET_Y } from './config'
+import { loadTerrainTextures } from './AssetLoader'
 
 function App() {
   const divRef = useRef<HTMLDivElement>(null)
@@ -17,19 +17,20 @@ function App() {
   const updateChunks = useCallback(() => {
     const pixiManager = pixiManagerRef.current
     const chunkManager = chunkManagerRef.current
-    const world = pixiManager?.getWorld()
+    const cameraManager = pixiManager?.getCameraManager()
 
-    if (!world || !chunkManager) return
+    if (!cameraManager || !chunkManager) return
 
-    const viewportCenterX = -world.x / world.scale.x
-    const viewportCenterY = -world.y / world.scale.y
+    const viewportCenterX = cameraManager.getCameraX()
+    const viewportCenterY = cameraManager.getCameraY()
+    const zoom = cameraManager.getZoom()
 
     chunkManager.updateVisibleChunks(
       viewportCenterX,
       viewportCenterY,
       window.innerWidth,
       window.innerHeight,
-      world.scale.x
+      zoom
     )
     chunkManager.updateDebugTextPositions()
   }, [])
@@ -58,11 +59,11 @@ function App() {
         pixiManagerRef.current = pixiManager
 
         const app = pixiManager.getApp()
-        const world = pixiManager.getWorld()
+        const cameraManager = pixiManager.getCameraManager()
 
-        if (!app || !world) return
+        if (!app || !cameraManager) return
 
-        const interactionManager = new InteractionManager(app, world, {
+        const interactionManager = new InteractionManager(app, cameraManager, {
           onViewportChange: updateChunks,
           onToggleSmoothing: () => {
             const chunkManager = chunkManagerRef.current
@@ -157,44 +158,13 @@ function App() {
           chunkManagerRef.current = null
         }
 
-        const [
-          grassTexture,
-          waterTexture,
-          grassWaterN,
-          grassWaterE,
-          grassWaterS,
-          grassWaterW,
-          grassWaterConcaveN,
-          grassWaterConcaveE,
-          grassWaterConcaveS,
-          grassWaterConcaveW
-        ] = await Promise.all([
-          Assets.load('/tiles/grass_center_E.png'),
-          Assets.load('/tiles/water_center_E.png'),
-          Assets.load('/tiles/grass_water_N.png'),
-          Assets.load('/tiles/grass_water_E.png'),
-          Assets.load('/tiles/grass_water_S.png'),
-          Assets.load('/tiles/grass_water_W.png'),
-          Assets.load('/tiles/grass_waterConcave_N.png'),
-          Assets.load('/tiles/grass_waterConcave_E.png'),
-          Assets.load('/tiles/grass_waterConcave_S.png'),
-          Assets.load('/tiles/grass_waterConcave_W.png')
-        ])
+        const { grassTexture, waterTexture, transitionTextures } = await loadTerrainTextures()
 
         const chunkManager = new ChunkManager(
           world,
           grassTexture,
           waterTexture,
-          {
-            grass_water_N: grassWaterN,
-            grass_water_E: grassWaterE,
-            grass_water_S: grassWaterS,
-            grass_water_W: grassWaterW,
-            grass_waterConcave_N: grassWaterConcaveN,
-            grass_waterConcave_E: grassWaterConcaveE,
-            grass_waterConcave_S: grassWaterConcaveS,
-            grass_waterConcave_W: grassWaterConcaveW
-          },
+          transitionTextures,
           TILE_OVERLAP,
           'procgentown',
           true

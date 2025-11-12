@@ -66,9 +66,7 @@ export class GridManager {
     this.hitboxOverlayManager = new HitboxOverlayManager(
       overlaysContainer,
       this.isoStepX,
-      this.isoStepY,
-      this.config.offsetX,
-      this.config.offsetY
+      this.isoStepY
     )
     this.hitboxOverlayManager.setGridVisible(this.config.visible)
 
@@ -78,14 +76,14 @@ export class GridManager {
   private draw(): void {
     this.graphics.clear()
 
-    const { offsetX, offsetY, numLines, lineWidth, lineColor } = this.config
+    const { numLines, lineWidth, lineColor } = this.config
 
-    // Draw grid lines using the same isometric projection as the tiles
-    // Tiles use: x = (col - row) * isoStepX, y = (col + row) * isoStepY
+    // Draw grid lines at tile edges by offsetting by 0.5 in grid coordinates
+    // This makes lines appear at the sides of tiles instead of through their centers
     for (let i = -numLines; i <= numLines; i++) {
       // Lines going in the "col" direction (slope = isoStepY / isoStepX = 0.5)
-      // These are lines where row is constant
-      const row = i
+      // These are lines where row is constant, offset by 0.5 to align with tile edges
+      const row = i + 0.5
       const startCol = -numLines
       const endCol = numLines
 
@@ -95,13 +93,13 @@ export class GridManager {
       const y2 = (endCol + row) * this.isoStepY
 
       this.graphics
-        .moveTo(x1 + offsetX, y1 + offsetY)
-        .lineTo(x2 + offsetX, y2 + offsetY)
+        .moveTo(x1, y1)
+        .lineTo(x2, y2)
         .stroke({ width: lineWidth, color: lineColor })
 
       // Lines going in the "row" direction (slope = -isoStepY / isoStepX = -0.5)
-      // These are lines where col is constant
-      const col = i
+      // These are lines where col is constant, offset by 0.5 to align with tile edges
+      const col = i + 0.5
       const startRow = -numLines
       const endRow = numLines
 
@@ -111,8 +109,8 @@ export class GridManager {
       const y4 = (col + endRow) * this.isoStepY
 
       this.graphics
-        .moveTo(x3 + offsetX, y3 + offsetY)
-        .lineTo(x4 + offsetX, y4 + offsetY)
+        .moveTo(x3, y3)
+        .lineTo(x4, y4)
         .stroke({ width: lineWidth, color: lineColor })
     }
   }
@@ -120,9 +118,9 @@ export class GridManager {
   /**
    * Add tile interaction (hitbox overlay and optional coordinate text)
    */
-  addTileInteraction(sprite: Sprite, col: number, row: number, showCoordinate: boolean = false): void {
+  addTileInteraction(sprite: Sprite | Graphics, col: number, row: number, showCoordinate: boolean = false): void {
     // Always create hitbox overlay for interaction
-    this.hitboxOverlayManager.createOverlay(sprite, col, row)
+    this.hitboxOverlayManager.createOverlay(sprite as Sprite, col, row)
 
     // Optionally add coordinate text for debug mode
     if (showCoordinate && this.debugOverlay) {
@@ -139,10 +137,18 @@ export class GridManager {
     const key = `${col},${row}`
     if (this.coordinateTexts.has(key)) return
 
-    // Calculate the position at the center of the tile
-    // The grid offset is for the grid lines, not the tile centers
+    // Calculate the position in pure world coordinates
     const worldX = (col - row) * this.isoStepX
     const worldY = (col + row) * this.isoStepY
+
+    // Create a blue box for debugging - positioned at tile center
+    const debugBox = new Graphics()
+    debugBox.rect(-20, -10, 40, 20)
+    debugBox.fill({ color: 0x0000ff, alpha: 0.3 })
+    debugBox.stroke({ color: 0x0000ff, width: 2 })
+    debugBox.x = worldX
+    debugBox.y = worldY
+    this.worldContainer.addChild(debugBox)
 
     const coordText = new Text({
       text: `${col},${row}`,
@@ -156,7 +162,10 @@ export class GridManager {
     coordText.anchor.set(0.5, 0.5)
     coordText.visible = this.config.visible && this.config.showCoordinates
 
-    this.debugOverlay.addChild(coordText)
+    // Place at pure world coordinates
+    coordText.x = worldX
+    coordText.y = worldY
+    this.worldContainer.addChild(coordText)
 
     this.coordinateTexts.set(key, {
       text: coordText,
@@ -165,9 +174,6 @@ export class GridManager {
       worldX,
       worldY
     })
-
-    // Update position immediately
-    this.updateCoordinatePosition(key)
   }
 
   /**
@@ -180,35 +186,16 @@ export class GridManager {
     const data = this.coordinateTexts.get(key)
     if (!data) return
 
-    if (this.debugOverlay) {
-      this.debugOverlay.removeChild(data.text)
-    }
+    this.worldContainer.removeChild(data.text)
     data.text.destroy()
     this.coordinateTexts.delete(key)
-  }
-
-  /**
-   * Update position of a single coordinate text
-   */
-  private updateCoordinatePosition(key: string): void {
-    const data = this.coordinateTexts.get(key)
-    if (!data) return
-
-    // Convert world coordinates to screen coordinates
-    const screenX = this.worldContainer.x + data.worldX * this.worldContainer.scale.x
-    const screenY = this.worldContainer.y + data.worldY * this.worldContainer.scale.y
-
-    data.text.x = screenX
-    data.text.y = screenY
   }
 
   /**
    * Update all coordinate text positions based on current world transform
    */
   updateCoordinatePositions(): void {
-    for (const key of this.coordinateTexts.keys()) {
-      this.updateCoordinatePosition(key)
-    }
+    // No-op: coordinate texts are now in world container, transform automatically applied
   }
 
   /**
@@ -216,9 +203,7 @@ export class GridManager {
    */
   clearCoordinateTexts(): void {
     for (const [, data] of this.coordinateTexts.entries()) {
-      if (this.debugOverlay) {
-        this.debugOverlay.removeChild(data.text)
-      }
+      this.worldContainer.removeChild(data.text)
       data.text.destroy()
     }
     this.coordinateTexts.clear()

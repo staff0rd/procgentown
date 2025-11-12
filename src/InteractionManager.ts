@@ -1,5 +1,6 @@
-import { Application, Container } from 'pixi.js'
-import { MIN_ZOOM, MAX_ZOOM, ZOOM_INTENSITY } from './config'
+import { Application } from 'pixi.js'
+import { CameraManager } from './CameraManager'
+import { ZOOM_INTENSITY } from './config'
 
 export interface InteractionCallbacks {
   onViewportChange?: () => void
@@ -14,7 +15,7 @@ export interface InteractionCallbacks {
  */
 export class InteractionManager {
   private app: Application
-  private world: Container
+  private cameraManager: CameraManager
   private callbacks: InteractionCallbacks
   private isDragging = false
   private lastPointerPosition = { x: 0, y: 0 }
@@ -23,9 +24,9 @@ export class InteractionManager {
   private keysPressed = new Set<string>()
   private viewportChangeThrottleId: number | null = null
 
-  constructor(app: Application, world: Container, callbacks: InteractionCallbacks = {}) {
+  constructor(app: Application, cameraManager: CameraManager, callbacks: InteractionCallbacks = {}) {
     this.app = app
-    this.world = world
+    this.cameraManager = cameraManager
     this.callbacks = callbacks
   }
 
@@ -71,8 +72,7 @@ export class InteractionManager {
       const deltaX = e.global.x - this.lastPointerPosition.x
       const deltaY = e.global.y - this.lastPointerPosition.y
 
-      this.world.x += deltaX
-      this.world.y += deltaY
+      this.cameraManager.pan(deltaX, deltaY)
 
       this.lastPointerPosition = { x: e.global.x, y: e.global.y }
 
@@ -95,35 +95,15 @@ export class InteractionManager {
       event.preventDefault()
 
       // Calculate zoom direction and amount
-      const direction = event.deltaY > 0 ? -1 : 1 // Scroll down = zoom out, scroll up = zoom in
+      const direction = event.deltaY > 0 ? -1 : 1
       const zoomFactor = 1 + direction * ZOOM_INTENSITY
 
       // Calculate new zoom level
-      const currentZoom = this.world.scale.x
-      let newZoom = currentZoom * zoomFactor
+      const currentZoom = this.cameraManager.getZoom()
+      const newZoom = currentZoom * zoomFactor
 
-      // Clamp zoom to min/max values
-      newZoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, newZoom))
-
-      // If zoom hasn't changed (hit limits), return early
-      if (newZoom === currentZoom) return
-
-      // Get mouse position in world coordinates before zoom
-      const mouseX = event.clientX
-      const mouseY = event.clientY
-      const worldPosBeforeX = (mouseX - this.world.x) / this.world.scale.x
-      const worldPosBeforeY = (mouseY - this.world.y) / this.world.scale.y
-
-      // Apply zoom
-      this.world.scale.set(newZoom, newZoom)
-
-      // Get mouse position in world coordinates after zoom
-      const worldPosAfterX = (mouseX - this.world.x) / this.world.scale.x
-      const worldPosAfterY = (mouseY - this.world.y) / this.world.scale.y
-
-      // Adjust world position to keep zoom centered on mouse
-      this.world.x += (worldPosAfterX - worldPosBeforeX) * this.world.scale.x
-      this.world.y += (worldPosAfterY - worldPosBeforeY) * this.world.scale.y
+      // Apply zoom centered on mouse position
+      this.cameraManager.zoom(newZoom, event.clientX, event.clientY)
 
       // Notify viewport change (throttled)
       this.notifyViewportChange()

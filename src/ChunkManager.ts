@@ -1,12 +1,14 @@
-import { Container, Sprite, Texture, Polygon } from 'pixi.js'
+import { Container, Texture, Polygon, Graphics } from 'pixi.js'
+import { CompositeTilemap } from '@pixi/tilemap'
 import { TerrainGenerator } from './TerrainGenerator'
 import type { TileVariant } from './TerrainGenerator'
 import type { GridManager } from './GridManager'
+import { RENDER_MINIMAL_TILES } from './config'
 
 export class ChunkManager {
-  private chunks: Map<string, Sprite[]> = new Map()
+  private chunks: Map<string, { hitAreas: Graphics[] }> = new Map()
   private chunkCoordinates: Map<string, Array<{ col: number; row: number }>> = new Map()
-  private tilesContainer: Container
+  private tilemap: CompositeTilemap
   private overlaysContainer: Container
   private tileTextures: Map<TileVariant, Texture> = new Map()
   private terrainGenerator: TerrainGenerator
@@ -20,8 +22,6 @@ export class ChunkManager {
   private readonly isoStepY: number
   private readonly CHUNK_SIZE = 16 // 16x16 tiles per chunk
   private readonly RENDER_DISTANCE = 2 // Load chunks within 2 chunks of viewport
-  private readonly GRID_OFFSET_X = 16
-  private readonly GRID_OFFSET_Y = -40
 
   constructor(
     worldContainer: Container,
@@ -56,11 +56,10 @@ export class ChunkManager {
     this.tileTextures.set('grass_waterConcave_S', edgeTextures.grass_waterConcave_S)
     this.tileTextures.set('grass_waterConcave_W', edgeTextures.grass_waterConcave_W)
 
-    // Create a single container for all tiles with sorting enabled
-    this.tilesContainer = new Container()
-    this.tilesContainer.sortableChildren = true
-    worldContainer.addChild(this.tilesContainer)
-    console.log('Created tilesContainer, children count:', worldContainer.children.length)
+    // Create CompositeTilemap for efficient tile rendering
+    this.tilemap = new CompositeTilemap()
+    worldContainer.addChild(this.tilemap)
+    console.log('Created CompositeTilemap, children count:', worldContainer.children.length)
 
     // Create a separate container for overlays (above tiles)
     this.overlaysContainer = new Container()
@@ -71,6 +70,7 @@ export class ChunkManager {
     // Calculate isometric steps using tile overlap
     this.isoStepX = (this.tileContentWidth - tileOverlap) / 2
     this.isoStepY = (this.tileContentWidth - tileOverlap) / 4
+    
 
     // Create terrain generator with fixed seed for consistency
     this.terrainGenerator = new TerrainGenerator(seed)
@@ -84,10 +84,18 @@ export class ChunkManager {
   }
 
   /**
+   * Check if a tile should be rendered based on RENDER_MINIMAL_TILES config
+   */
+  private shouldRenderTile(col: number, row: number): boolean {
+    if (!RENDER_MINIMAL_TILES) return true
+    return (col === 0 || col === 1) && (row === 0 || row === 1)
+  }
+
+  /**
    * Generate a chunk at the given chunk coordinates
    */
-  private generateChunk(chunkX: number, chunkY: number): Sprite[] {
-    const sprites: Sprite[] = []
+  private generateChunk(chunkX: number, chunkY: number): { hitAreas: Graphics[] } {
+    const hitAreas: Graphics[] = []
     const coordinates: Array<{ col: number; row: number }> = []
 
     const { tileVariants } = this.terrainGenerator.generateChunkTerrain(chunkX, chunkY, this.CHUNK_SIZE)
@@ -97,8 +105,12 @@ export class ChunkManager {
     const endCol = startCol + this.CHUNK_SIZE
     const endRow = startRow + this.CHUNK_SIZE
 
+    console.log(`🔷 Generating chunk (${chunkX}, ${chunkY}): tiles (${startCol},${startRow}) to (${endCol-1},${endRow-1})`)
+
     for (let row = startRow; row < endRow; row++) {
       for (let col = startCol; col < endCol; col++) {
+        if (!this.shouldRenderTile(col, row)) continue
+
         const key = `${col},${row}`
         const variant = tileVariants.get(key) || 'grass'
         const texture = this.tileTextures.get(variant)
@@ -108,40 +120,67 @@ export class ChunkManager {
           continue
         }
 
-        const sprite = new Sprite(texture)
+        // Position in world coordinates (isometric space) - pure grid coordinates
+        const worldX = (col - row) * this.isoStepX
+        const worldY = (col + row) * this.isoStepY
 
-        // Position in isometric space
-        sprite.x = (col - row) * this.isoStepX
-        sprite.y = (col + row) * this.isoStepY
+        // Debug: log tiles around the problem area
+        if (col >= -5 && col <= -1 && row >= -51 && row <= -47) {
+          console.log(`🔴 Tile (${col},${row}): worldY=${worldY.toFixed(2)} [calc: (${col} + ${row}) * ${this.isoStepY} = ${col + row} * ${this.isoStepY}]`)
+        }
 
-        // Set zIndex for global isometric depth sorting
-        // Tiles with smaller col+row should render behind (lower zIndex)
-        sprite.zIndex = col + row
+        // Center the texture on the tile position (no offsets here)
+        const tileX = worldX - texture.width / 2
+        const tileY = worldY - texture.height / 2
 
-        // Set initial alpha based on tile visibility
-        sprite.alpha = this.tilesVisible ? 1 : 0
+        // Add tile to tilemap at pure world coordinates
+        this.tilemap.tile(texture, tileX, tileY)
 
+        // Add red debug box around the actual texture placement
+        const debugBox = new Graphics()
+        debugBox.x = worldX
+        debugBox.y = worldY
+        debugBox.rect(
+          -texture.width / 2,
+          -texture.height / 2,
+          texture.width,
+          texture.height
+        )
+        debugBox.stroke({ width: 2, color: 0xff0000 })
+        //this.overlaysContainer.addChild(debugBox)
 
-        const hitCenterX = this.GRID_OFFSET_X
-        const hitCenterY = this.GRID_OFFSET_Y - this.isoStepY + 2 * this.isoStepY
+        // Create hit area for interaction
+        const hitArea = new Graphics()
+        hitArea.alpha = 1  // Make visible for debugging
+        hitArea.eventMode = 'static'
+        hitArea.x = worldX
+        hitArea.y = worldY
 
-        sprite.hitArea = new Polygon([
-          hitCenterX, hitCenterY - this.isoStepY,           // Top point
-          hitCenterX + this.isoStepX, hitCenterY,            // Right point
-          hitCenterX, hitCenterY + this.isoStepY,            // Bottom point
-          hitCenterX - this.isoStepX, hitCenterY             // Left point
+        // Hit polygon centered at origin (will be offset by hitArea.x/y)
+        const hitPolygon = new Polygon([
+          0, -this.isoStepY,
+          this.isoStepX, 0,
+          0, this.isoStepY,
+          -this.isoStepX, 0
         ])
 
-        this.tilesContainer.addChild(sprite)
-        sprites.push(sprite)
+        hitArea.hitArea = hitPolygon
 
-        if (sprites.length === 1) {
-          console.log(`First sprite added to chunk ${chunkX},${chunkY}`)
+        // Draw the hitbox polygon visibly for debugging
+        hitArea.poly(hitPolygon.points)
+        //hitArea.fill({ color: 0x00ff00, alpha: 0.3 })
+        //hitArea.stroke({ width: 2, color: 0x00ff00 })
+
+        this.overlaysContainer.addChild(hitArea)
+        hitAreas.push(hitArea)
+
+        if (hitAreas.length === 1) {
+          console.log(`First tile added to chunk ${chunkX},${chunkY}`)
         }
 
         // Add tile interaction to GridManager
         if (this.gridManager) {
-          this.gridManager.addTileInteraction(sprite, col, row, this.debugMode)
+          this.gridManager.addTileInteraction(hitArea, col, row, this.debugMode)
           coordinates.push({ col, row })
         }
       }
@@ -153,7 +192,7 @@ export class ChunkManager {
       this.chunkCoordinates.set(chunkKey, coordinates)
     }
 
-    return sprites
+    return { hitAreas }
   }
 
   /**
@@ -234,6 +273,7 @@ export class ChunkManager {
 
     // Track which chunks should be loaded
     const chunksToKeep = new Set<string>()
+    let needsRebuild = false
 
     // Load visible chunks
     for (let chunkY = minChunkY; chunkY <= maxChunkY; chunkY++) {
@@ -243,21 +283,23 @@ export class ChunkManager {
 
         // Generate chunk if it doesn't exist
         if (!this.chunks.has(key)) {
-          const sprites = this.generateChunk(chunkX, chunkY)
-          this.chunks.set(key, sprites)
+          const chunkData = this.generateChunk(chunkX, chunkY)
+          this.chunks.set(key, chunkData)
+          needsRebuild = true
         }
       }
     }
 
     // Unload chunks that are too far away
-    for (const [key, sprites] of this.chunks.entries()) {
+    for (const [key, chunkData] of this.chunks.entries()) {
       if (!chunksToKeep.has(key)) {
-        // Remove and destroy all sprites in this chunk
-        for (const sprite of sprites) {
-          this.tilesContainer.removeChild(sprite)
-          sprite.destroy()
+        // Remove and destroy all hit areas in this chunk
+        for (const hitArea of chunkData.hitAreas) {
+          this.overlaysContainer.removeChild(hitArea)
+          hitArea.destroy()
         }
         this.chunks.delete(key)
+        needsRebuild = true
 
         // Clean up tile interactions for this chunk
         if (this.chunkCoordinates.has(key)) {
@@ -268,6 +310,50 @@ export class ChunkManager {
             }
           }
           this.chunkCoordinates.delete(key)
+        }
+      }
+    }
+
+    // Rebuild tilemap if chunks changed
+    if (needsRebuild) {
+      this.rebuildTilemap()
+    }
+  }
+
+  /**
+   * Rebuild the entire tilemap from scratch
+   */
+  private rebuildTilemap(): void {
+    this.tilemap.clear()
+
+    for (const [key] of this.chunks.entries()) {
+      const [chunkX, chunkY] = key.split(',').map(Number)
+      const { tileVariants } = this.terrainGenerator.generateChunkTerrain(chunkX, chunkY, this.CHUNK_SIZE)
+
+      const startCol = chunkX * this.CHUNK_SIZE
+      const startRow = chunkY * this.CHUNK_SIZE
+      const endCol = startCol + this.CHUNK_SIZE
+      const endRow = startRow + this.CHUNK_SIZE
+
+      for (let row = startRow; row < endRow; row++) {
+        for (let col = startCol; col < endCol; col++) {
+          if (!this.shouldRenderTile(col, row)) continue
+
+          const tileKey = `${col},${row}`
+          const variant = tileVariants.get(tileKey) || 'grass'
+          const texture = this.tileTextures.get(variant)
+
+          if (!texture) continue
+
+          // Position in pure world coordinates
+          const worldX = (col - row) * this.isoStepX
+          const worldY = (col + row) * this.isoStepY
+
+          // Center the texture on the tile position
+          const tileX = worldX - texture.width / 2
+          const tileY = worldY - texture.height / 2
+
+          this.tilemap.tile(texture, tileX, tileY)
         }
       }
     }
@@ -288,10 +374,10 @@ export class ChunkManager {
     const chunkKeys = Array.from(this.chunks.keys())
 
     // Destroy all existing chunks
-    for (const [key, sprites] of this.chunks.entries()) {
-      for (const sprite of sprites) {
-        this.tilesContainer.removeChild(sprite)
-        sprite.destroy()
+    for (const [key, chunkData] of this.chunks.entries()) {
+      for (const hitArea of chunkData.hitAreas) {
+        this.overlaysContainer.removeChild(hitArea)
+        hitArea.destroy()
       }
 
       // Clean up tile interactions
@@ -310,30 +396,27 @@ export class ChunkManager {
     // Regenerate all chunks
     for (const key of chunkKeys) {
       const [chunkX, chunkY] = key.split(',').map(Number)
-      const sprites = this.generateChunk(chunkX, chunkY)
-      this.chunks.set(key, sprites)
+      const chunkData = this.generateChunk(chunkX, chunkY)
+      this.chunks.set(key, chunkData)
     }
+
+    // Rebuild entire tilemap
+    this.rebuildTilemap()
   }
 
   /**
-   * Get the tiles container
+   * Get the tilemap container
    */
-  public getTilesContainer(): Container {
-    return this.tilesContainer
+  public getTilesContainer(): CompositeTilemap {
+    return this.tilemap
   }
 
   /**
-   * Toggle tile visibility (uses alpha to keep sprites interactive)
+   * Toggle tile visibility
    */
   public toggleTileVisibility(): void {
     this.tilesVisible = !this.tilesVisible
-    const targetAlpha = this.tilesVisible ? 1 : 0
-
-    for (const sprites of this.chunks.values()) {
-      for (const sprite of sprites) {
-        sprite.alpha = targetAlpha
-      }
-    }
+    this.tilemap.alpha = this.tilesVisible ? 1 : 0
   }
 
   /**
@@ -354,9 +437,9 @@ export class ChunkManager {
    * Clean up all chunks
    */
   public destroy(): void {
-    for (const [, sprites] of this.chunks.entries()) {
-      for (const sprite of sprites) {
-        sprite.destroy()
+    for (const [, chunkData] of this.chunks.entries()) {
+      for (const hitArea of chunkData.hitAreas) {
+        hitArea.destroy()
       }
     }
     this.chunks.clear()
@@ -373,6 +456,6 @@ export class ChunkManager {
     this.chunkCoordinates.clear()
 
     this.overlaysContainer.destroy({ children: true })
-    this.tilesContainer.destroy({ children: true })
+    this.tilemap.destroy({ children: true })
   }
 }

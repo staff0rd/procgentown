@@ -1,4 +1,5 @@
 import { Application, Container } from 'pixi.js'
+import { CameraManager } from './CameraManager'
 
 /**
  * Manages the PixiJS Application lifecycle, including initialization,
@@ -8,6 +9,7 @@ export class PixiAppManager {
   private app: Application | null = null
   private world: Container | null = null
   private debugOverlay: Container | null = null
+  private cameraManager: CameraManager | null = null
   private resizeHandler: (() => void) | null = null
 
   async initialize(parentElement: HTMLDivElement): Promise<void> {
@@ -27,26 +29,28 @@ export class PixiAppManager {
     console.log('Canvas added, dimensions:', app.canvas.width, 'x', app.canvas.height)
     console.log('Canvas style:', app.canvas.style.cssText)
 
-    // Create world container (center of screen, affected by pan/zoom)
+    // Create world container
     const world = new Container()
-    world.x = window.innerWidth / 2
-    world.y = window.innerHeight / 2
     this.world = world
     app.stage.addChild(world)
     console.log('World container added to stage, stage children:', app.stage.children.length)
+
+    // Initialize camera manager with proper pivot/position transform
+    this.cameraManager = new CameraManager(world, window.innerWidth, window.innerHeight)
 
     // Create debug overlay container (separate from world, not affected by transforms)
     const debugOverlay = new Container()
     this.debugOverlay = debugOverlay
     app.stage.addChild(debugOverlay)
 
-    console.log('PixiJS app initialized - World position:', world.x, world.y)
+    console.log('PixiJS app initialized with CameraManager')
   }
 
   setupResize(onResize?: () => void): void {
     this.resizeHandler = () => {
-      if (this.app && this.app.renderer) {
+      if (this.app && this.app.renderer && this.cameraManager) {
         this.app.renderer.resize(window.innerWidth, window.innerHeight)
+        this.cameraManager.updateScreenSize(window.innerWidth, window.innerHeight)
         if (onResize) {
           onResize()
         }
@@ -68,6 +72,10 @@ export class PixiAppManager {
     return this.debugOverlay
   }
 
+  getCameraManager(): CameraManager | null {
+    return this.cameraManager
+  }
+
   destroy(): void {
     if (this.resizeHandler) {
       window.removeEventListener('resize', this.resizeHandler)
@@ -81,5 +89,6 @@ export class PixiAppManager {
     this.app = null
     this.world = null
     this.debugOverlay = null
+    this.cameraManager = null
   }
 }

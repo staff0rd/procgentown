@@ -7,23 +7,17 @@ export class HitboxOverlayManager {
   private container: Container
   private isoStepX: number
   private isoStepY: number
-  private gridOffsetX: number
-  private gridOffsetY: number
   private isGridVisible: boolean = false
   private lastLoggedTile: string | null = null
 
   constructor(
     container: Container,
     isoStepX: number,
-    isoStepY: number,
-    gridOffsetX: number,
-    gridOffsetY: number
+    isoStepY: number
   ) {
     this.container = container
     this.isoStepX = isoStepX
     this.isoStepY = isoStepY
-    this.gridOffsetX = gridOffsetX
-    this.gridOffsetY = gridOffsetY
   }
 
   createOverlay(sprite: Sprite, col: number, row: number): void {
@@ -31,15 +25,12 @@ export class HitboxOverlayManager {
 
     const hitboxGraphics = new Graphics()
 
-    // Shift the center to match the visual tile diamond
-    const centerX = this.gridOffsetX
-    const centerY = this.gridOffsetY - this.isoStepY + 2 * this.isoStepY
-
+    // Create diamond centered at (0, 0) to align with grid lines
     hitboxGraphics.poly([
-      centerX, centerY - this.isoStepY,
-      centerX + this.isoStepX, centerY,
-      centerX, centerY + this.isoStepY,
-      centerX - this.isoStepX, centerY
+      0, -this.isoStepY,
+      this.isoStepX, 0,
+      0, this.isoStepY,
+      -this.isoStepX, 0
     ])
     hitboxGraphics.fill({ color: 0xff0000, alpha: 0.3 })
     hitboxGraphics.visible = false
