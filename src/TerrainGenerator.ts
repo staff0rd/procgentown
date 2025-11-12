@@ -233,12 +233,10 @@ export class TerrainGenerator {
     }
     // grass_waterConcave_W: water on S+E, grass curves in from W
     if (hasWaterS && hasWaterE && !hasWaterW && !hasWaterN) {
-      if (col === 2 && row === 3) console.log('  -> grass_waterConcave_W')
       return 'grass_waterConcave_W'
     }
 
     // Default to water for any other configuration
-    if (col === 2 && row === 3) console.log('  -> water (default)')
     return 'water'
   }
 
@@ -272,15 +270,6 @@ export class TerrainGenerator {
 
         const variant = this.getWaterTileVariant(col, row, waterMap)
         tileVariants.set(key, variant)
-
-        const logTileCol = 2
-        const logTileRow = 3
-        if (col === logTileCol && row === logTileRow) {
-          console.log(`Tile ${col},${row}: ${isWater ? 'WATER' : 'grass'} -> ${variant}`)
-          if (isWater) {
-            console.log(`  Neighbors: N(${col+1},${row})=${waterMap.get(`${col+1},${row}`)}, E(${col},${row+1})=${waterMap.get(`${col},${row+1}`)}, S(${col-1},${row})=${waterMap.get(`${col-1},${row}`)}, W(${col},${row-1})=${waterMap.get(`${col},${row-1}`)}`)
-          }
-        }
       }
     }
 
