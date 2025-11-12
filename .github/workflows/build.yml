@@ -15,7 +15,7 @@ jobs:
         with:
           node-version: "22"
 
-      - run: npm ci
+      - run: npm ci --omit=optional
         name: Install dependencies
 
       - run: npm run build
