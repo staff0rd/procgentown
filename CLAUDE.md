@@ -3,6 +3,8 @@ Typescript (vite + react + pixijs) application.
 - After making changes, run the following in parallel sub-agents to verify correctness, fixing any errors:
  - `npm run build`
  - `npm run test:run`
+ - `npm run lint`
+    - fix any linting errors reported by biome
  - `npm run knip`
     - remove any unused files or dependencies reported by knip
 

@@ -1,194 +1,205 @@
-import { useEffect, useRef, useState, useCallback } from 'react'
-import { ChunkManager } from './ChunkManager'
-import { GridManager } from './GridManager'
-import { PixiAppManager } from './PixiAppManager'
-import { InteractionManager } from './InteractionManager'
-import { TILE_OVERLAP, GRID_OFFSET_X, GRID_OFFSET_Y } from './config'
-import { loadTerrainTextures } from './AssetLoader'
+import { useCallback, useEffect, useRef, useState } from "react";
+import { loadTerrainTextures } from "./AssetLoader";
+import { ChunkManager } from "./ChunkManager";
+import { GRID_OFFSET_X, GRID_OFFSET_Y, TILE_OVERLAP } from "./config";
+import { GridManager } from "./GridManager";
+import { InteractionManager } from "./InteractionManager";
+import { PixiAppManager } from "./PixiAppManager";
 
 function App() {
-  const divRef = useRef<HTMLDivElement>(null)
-  const pixiManagerRef = useRef<PixiAppManager | null>(null)
-  const interactionManagerRef = useRef<InteractionManager | null>(null)
-  const chunkManagerRef = useRef<ChunkManager | null>(null)
-  const gridManagerRef = useRef<GridManager | null>(null)
-  const [hmrTrigger, setHmrTrigger] = useState(0)
+	const divRef = useRef<HTMLDivElement>(null);
+	const pixiManagerRef = useRef<PixiAppManager | null>(null);
+	const interactionManagerRef = useRef<InteractionManager | null>(null);
+	const chunkManagerRef = useRef<ChunkManager | null>(null);
+	const gridManagerRef = useRef<GridManager | null>(null);
+	const [hmrTrigger, setHmrTrigger] = useState(0);
 
-  const updateChunks = useCallback(() => {
-    const pixiManager = pixiManagerRef.current
-    const chunkManager = chunkManagerRef.current
-    const cameraManager = pixiManager?.getCameraManager()
+	const updateChunks = useCallback(() => {
+		const pixiManager = pixiManagerRef.current;
+		const chunkManager = chunkManagerRef.current;
+		const cameraManager = pixiManager?.getCameraManager();
 
-    if (!cameraManager || !chunkManager) return
+		if (!cameraManager || !chunkManager) return;
 
-    const viewportCenterX = cameraManager.getCameraX()
-    const viewportCenterY = cameraManager.getCameraY()
-    const zoom = cameraManager.getZoom()
+		const viewportCenterX = cameraManager.getCameraX();
+		const viewportCenterY = cameraManager.getCameraY();
+		const zoom = cameraManager.getZoom();
 
-    chunkManager.updateVisibleChunks(
-      viewportCenterX,
-      viewportCenterY,
-      window.innerWidth,
-      window.innerHeight,
-      zoom
-    )
-    chunkManager.updateDebugTextPositions()
-  }, [])
+		chunkManager.updateVisibleChunks(
+			viewportCenterX,
+			viewportCenterY,
+			window.innerWidth,
+			window.innerHeight,
+			zoom,
+		);
+		chunkManager.updateDebugTextPositions();
+	}, []);
 
-  useEffect(() => {
-    if (!divRef.current) return
+	useEffect(() => {
+		if (!divRef.current) return;
 
-    let isCancelled = false
+		let isCancelled = false;
 
-    const initApp = async () => {
-      if (pixiManagerRef.current) {
-        return
-      }
+		const initApp = async () => {
+			if (pixiManagerRef.current) {
+				return;
+			}
 
-      try {
-        const pixiManager = new PixiAppManager()
-        await pixiManager.initialize(divRef.current!)
+			if (!divRef.current) {
+				return;
+			}
 
-        if (isCancelled) {
-          pixiManager.destroy()
-          return
-        }
+			try {
+				const pixiManager = new PixiAppManager();
+				await pixiManager.initialize(divRef.current);
 
-        pixiManagerRef.current = pixiManager
+				if (isCancelled) {
+					pixiManager.destroy();
+					return;
+				}
 
-        const app = pixiManager.getApp()
-        const cameraManager = pixiManager.getCameraManager()
+				pixiManagerRef.current = pixiManager;
 
-        if (!app || !cameraManager) return
+				const app = pixiManager.getApp();
+				const cameraManager = pixiManager.getCameraManager();
 
-        const interactionManager = new InteractionManager(app, cameraManager, {
-          onViewportChange: updateChunks,
-          onToggleSmoothing: () => {
-            const chunkManager = chunkManagerRef.current
-            if (chunkManager) {
-              const terrainGen = chunkManager.getTerrainGenerator()
-              terrainGen.toggleSmoothing()
-              chunkManager.regenerateAllChunks()
-            }
-          },
-          onToggleGrid: () => {
-            const gridManager = gridManagerRef.current
-            if (gridManager) {
-              gridManager.toggle()
-            }
-          },
-          onToggleTiles: () => {
-            const chunkManager = chunkManagerRef.current
-            if (chunkManager) {
-              chunkManager.toggleTileVisibility()
-            }
-          },
-          getCurrentTile: () => {
-            const gridManager = gridManagerRef.current
-            return gridManager ? gridManager.getCurrentHoveredTile() : null
-          }
-        })
+				if (!app || !cameraManager) return;
 
-        interactionManager.setupInteractions()
-        interactionManagerRef.current = interactionManager
+				const interactionManager = new InteractionManager(app, cameraManager, {
+					onViewportChange: updateChunks,
+					onToggleSmoothing: () => {
+						const chunkManager = chunkManagerRef.current;
+						if (chunkManager) {
+							const terrainGen = chunkManager.getTerrainGenerator();
+							terrainGen.toggleSmoothing();
+							chunkManager.regenerateAllChunks();
+						}
+					},
+					onToggleGrid: () => {
+						const gridManager = gridManagerRef.current;
+						if (gridManager) {
+							gridManager.toggle();
+						}
+					},
+					onToggleTiles: () => {
+						const chunkManager = chunkManagerRef.current;
+						if (chunkManager) {
+							chunkManager.toggleTileVisibility();
+						}
+					},
+					getCurrentTile: () => {
+						const gridManager = gridManagerRef.current;
+						return gridManager ? gridManager.getCurrentHoveredTile() : null;
+					},
+				});
 
-        pixiManager.setupResize(updateChunks)
+				interactionManager.setupInteractions();
+				interactionManagerRef.current = interactionManager;
 
-        setHmrTrigger(prev => prev + 1)
-      } catch (error) {
-        console.error('Failed to initialize PixiJS app:', error)
-      }
-    }
+				pixiManager.setupResize(updateChunks);
 
-    initApp()
+				setHmrTrigger((prev) => prev + 1);
+			} catch (error) {
+				console.error("Failed to initialize PixiJS app:", error);
+			}
+		};
 
-    return () => {
-      isCancelled = true
+		initApp();
 
-      if (gridManagerRef.current) {
-        gridManagerRef.current.destroy()
-        gridManagerRef.current = null
-      }
+		return () => {
+			isCancelled = true;
 
-      if (chunkManagerRef.current) {
-        chunkManagerRef.current.destroy()
-        chunkManagerRef.current = null
-      }
+			if (gridManagerRef.current) {
+				gridManagerRef.current.destroy();
+				gridManagerRef.current = null;
+			}
 
-      if (interactionManagerRef.current) {
-        interactionManagerRef.current.destroy()
-        interactionManagerRef.current = null
-      }
+			if (chunkManagerRef.current) {
+				chunkManagerRef.current.destroy();
+				chunkManagerRef.current = null;
+			}
 
-      if (pixiManagerRef.current) {
-        pixiManagerRef.current.destroy()
-        pixiManagerRef.current = null
-      }
-    }
-  }, [updateChunks])
+			if (interactionManagerRef.current) {
+				interactionManagerRef.current.destroy();
+				interactionManagerRef.current = null;
+			}
 
-  useEffect(() => {
-    const pixiManager = pixiManagerRef.current
-    const world = pixiManager?.getWorld()
-    const debugOverlay = pixiManager?.getDebugOverlay()
+			if (pixiManagerRef.current) {
+				pixiManagerRef.current.destroy();
+				pixiManagerRef.current = null;
+			}
+		};
+	}, [updateChunks]);
 
-    if (!world || !debugOverlay) return
+	// biome-ignore lint/correctness/useExhaustiveDependencies: hmrTrigger intentionally triggers re-initialization
+	useEffect(() => {
+		const pixiManager = pixiManagerRef.current;
+		const world = pixiManager?.getWorld();
+		const debugOverlay = pixiManager?.getDebugOverlay();
 
-    if (world.children.length > 0) {
-      world.removeChildren()
-    }
+		if (!world || !debugOverlay) return;
 
-    const setupWorld = async () => {
-      try {
-        if (gridManagerRef.current) {
-          gridManagerRef.current.destroy()
-          gridManagerRef.current = null
-        }
+		if (world.children.length > 0) {
+			world.removeChildren();
+		}
 
-        if (chunkManagerRef.current) {
-          chunkManagerRef.current.destroy()
-          chunkManagerRef.current = null
-        }
+		const setupWorld = async () => {
+			try {
+				if (gridManagerRef.current) {
+					gridManagerRef.current.destroy();
+					gridManagerRef.current = null;
+				}
 
-        const { grassTexture, waterTexture, transitionTextures } = await loadTerrainTextures()
+				if (chunkManagerRef.current) {
+					chunkManagerRef.current.destroy();
+					chunkManagerRef.current = null;
+				}
 
-        const chunkManager = new ChunkManager(
-          world,
-          grassTexture,
-          waterTexture,
-          transitionTextures,
-          TILE_OVERLAP,
-          'procgentown',
-          true
-        )
-        chunkManagerRef.current = chunkManager
+				const { grassTexture, waterTexture, transitionTextures } =
+					await loadTerrainTextures();
 
-        const gridManager = new GridManager(
-          world,
-          world,
-          debugOverlay,
-          chunkManager.getOverlaysContainer(),
-          {
-            offsetX: GRID_OFFSET_X,
-            offsetY: GRID_OFFSET_Y,
-            visible: true,
-            showCoordinates: true
-          }
-        )
-        gridManagerRef.current = gridManager
+				const chunkManager = new ChunkManager(
+					world,
+					grassTexture,
+					waterTexture,
+					transitionTextures,
+					TILE_OVERLAP,
+					"procgentown",
+					true,
+				);
+				chunkManagerRef.current = chunkManager;
 
-        chunkManager.setGridManager(gridManager)
+				const gridManager = new GridManager(
+					world,
+					world,
+					debugOverlay,
+					chunkManager.getOverlaysContainer(),
+					{
+						offsetX: GRID_OFFSET_X,
+						offsetY: GRID_OFFSET_Y,
+						visible: false,
+						showCoordinates: true,
+					},
+				);
+				gridManagerRef.current = gridManager;
 
-        updateChunks()
-      } catch (error) {
-        console.error('Failed to load textures:', error)
-      }
-    }
+				chunkManager.setGridManager(gridManager);
 
-    setupWorld()
-  }, [hmrTrigger, updateChunks])
+				updateChunks();
+			} catch (error) {
+				console.error("Failed to load textures:", error);
+			}
+		};
 
-  return <div ref={divRef} style={{ width: '100vw', height: '100vh', overflow: 'hidden' }} />
+		setupWorld();
+	}, [hmrTrigger, updateChunks]);
+
+	return (
+		<div
+			ref={divRef}
+			style={{ width: "100vw", height: "100vh", overflow: "hidden" }}
+		/>
+	);
 }
 
-export default App
+export default App;
