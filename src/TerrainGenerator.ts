@@ -13,7 +13,8 @@ export type TileVariant =
 	| "grass_waterConcave_N"
 	| "grass_waterConcave_E"
 	| "grass_waterConcave_S"
-	| "grass_waterConcave_W";
+	| "grass_waterConcave_W"
+	| "grass_waterConvex_NS";
 
 export interface ChunkTerrainResult {
 	mapData: MapData;
@@ -211,8 +212,21 @@ export class TerrainGenerator {
 			Boolean,
 		).length;
 
-		// If surrounded by water on all sides, it's full water
+		// If surrounded by water on all sides, check diagonals for convex corners
 		if (waterCount === 4) {
+			// Check diagonal neighbors
+			// NE = (col+1, row+1), SE = (col-1, row+1)
+			// SW = (col-1, row-1), NW = (col+1, row-1)
+			const hasWaterNE = waterMap.get(`${col + 1},${row + 1}`) || false;
+			const hasWaterSE = waterMap.get(`${col - 1},${row + 1}`) || false;
+			const hasWaterSW = waterMap.get(`${col - 1},${row - 1}`) || false;
+			const hasWaterNW = waterMap.get(`${col + 1},${row - 1}`) || false;
+
+			// Convex NS: grass at NE and SW corners
+			if (!hasWaterNE && !hasWaterSW && hasWaterNW && hasWaterSE) {
+				return "grass_waterConvex_NS";
+			}
+
 			return "water";
 		}
 

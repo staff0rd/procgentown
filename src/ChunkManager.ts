@@ -39,6 +39,7 @@ export class ChunkManager {
 			grass_waterConcave_E: Texture;
 			grass_waterConcave_S: Texture;
 			grass_waterConcave_W: Texture;
+			grass_waterConvex_NS: Texture;
 		},
 		tileOverlap: number,
 		seed: string = "procgentown",
@@ -69,6 +70,10 @@ export class ChunkManager {
 		this.tileTextures.set(
 			"grass_waterConcave_W",
 			edgeTextures.grass_waterConcave_W,
+		);
+		this.tileTextures.set(
+			"grass_waterConvex_NS",
+			edgeTextures.grass_waterConvex_NS,
 		);
 
 		// Create CompositeTilemap for efficient tile rendering
@@ -238,13 +243,31 @@ export class ChunkManager {
 	}
 
 	/**
-	 * Handle tile click - display 3x3 grid of base tile types
+	 * Get tile variant at a specific position (queries across chunks)
+	 */
+	private getTileVariant(col: number, row: number): TileVariant | undefined {
+		const { chunkX, chunkY } = this.tileToChunk(col, row);
+		const { tileVariants } = this.terrainGenerator.generateChunkTerrain(
+			chunkX,
+			chunkY,
+			this.CHUNK_SIZE,
+		);
+		const key = `${col},${row}`;
+		return tileVariants.get(key);
+	}
+
+	/**
+	 * Handle tile click - display 3x3 grid of base tile types and clicked tile texture
 	 */
 	private handleTileClick(col: number, row: number): void {
 		const lines: string[] = [];
 
 		// Add clicked tile coordinate
 		lines.push(`Clicked tile: (${col}, ${row})`);
+		const clickedVariant = this.getTileVariant(col, row);
+		if (clickedVariant) {
+			lines.push(`Texture: ${clickedVariant}`);
+		}
 		lines.push(""); // Empty line for spacing
 
 		// Calculate max width needed for row labels
