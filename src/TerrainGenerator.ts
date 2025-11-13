@@ -1,6 +1,6 @@
+import Rand from 'rand-seed'
 import { createNoise2D } from 'simplex-noise'
 import type { NoiseFunction2D } from 'simplex-noise'
-import Rand from 'rand-seed'
 import { MapData } from './MapData'
 
 export type TileVariant =
@@ -289,14 +289,6 @@ export class TerrainGenerator {
           line += type === 'water' ? ' W' : ' G'
         }
         console.log(line)
-      }
-      console.log('\nDetailed tile info (0,0 to 4,4):')
-      for (let row = 0; row <= 4; row++) {
-        for (let col = 0; col <= 4; col++) {
-          const type = mapData.get(col, row)
-          const variant = tileVariants.get(`${col},${row}`)
-          console.log(`(${col},${row}): map=${type}, render=${variant}`)
-        }
       }
       console.log('\nDiagonal check (0,0 -> 1,1 -> 2,2 -> 3,3 -> 4,4):')
       for (let i = 0; i <= 4; i++) {

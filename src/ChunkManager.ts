@@ -3,7 +3,7 @@ import { CompositeTilemap } from '@pixi/tilemap'
 import { TerrainGenerator } from './TerrainGenerator'
 import type { TileVariant } from './TerrainGenerator'
 import type { GridManager } from './GridManager'
-import { RENDER_MINIMAL_TILES } from './config'
+import { RENDER_MINIMAL_TILES, RENDER_AXES_ONLY } from './config'
 
 export class ChunkManager {
   private chunks: Map<string, { hitAreas: Graphics[] }> = new Map()
@@ -84,9 +84,10 @@ export class ChunkManager {
   }
 
   /**
-   * Check if a tile should be rendered based on RENDER_MINIMAL_TILES config
+   * Check if a tile should be rendered based on RENDER_MINIMAL_TILES and RENDER_AXES_ONLY configs
    */
   private shouldRenderTile(col: number, row: number): boolean {
+    if (RENDER_AXES_ONLY) return col === 0 || row === 0
     if (!RENDER_MINIMAL_TILES) return true
     return (col === 0 || col === 1) && (row === 0 || row === 1)
   }
@@ -107,82 +108,92 @@ export class ChunkManager {
 
     console.log(`🔷 Generating chunk (${chunkX}, ${chunkY}): tiles (${startCol},${startRow}) to (${endCol-1},${endRow-1})`)
 
+    // Collect tiles first for proper z-ordering
+    const tilesToRender: Array<{ col: number; row: number; depth: number }> = []
     for (let row = startRow; row < endRow; row++) {
       for (let col = startCol; col < endCol; col++) {
         if (!this.shouldRenderTile(col, row)) continue
+        // Calculate isometric depth (col + row) - tiles with lower depth are further back
+        const depth = col + row
+        tilesToRender.push({ col, row, depth })
+      }
+    }
 
-        const key = `${col},${row}`
-        const variant = tileVariants.get(key) || 'grass'
-        const texture = this.tileTextures.get(variant)
+    // Sort tiles by depth (back to front) for proper z-ordering
+    tilesToRender.sort((a, b) => a.depth - b.depth)
 
-        if (!texture) {
-          console.warn(`Missing texture for variant: ${variant}`)
-          continue
-        }
+    for (const { col, row } of tilesToRender) {
+      const key = `${col},${row}`
+      const variant = tileVariants.get(key) || 'grass'
+      const texture = this.tileTextures.get(variant)
 
-        // Position in world coordinates (isometric space) - pure grid coordinates
-        const worldX = (col - row) * this.isoStepX
-        const worldY = (col + row) * this.isoStepY
+      if (!texture) {
+        console.warn(`Missing texture for variant: ${variant}`)
+        continue
+      }
 
-        // Debug: log tiles around the problem area
-        if (col >= -5 && col <= -1 && row >= -51 && row <= -47) {
-          console.log(`🔴 Tile (${col},${row}): worldY=${worldY.toFixed(2)} [calc: (${col} + ${row}) * ${this.isoStepY} = ${col + row} * ${this.isoStepY}]`)
-        }
+      // Position in world coordinates (isometric space) - pure grid coordinates
+      const worldX = (col - row) * this.isoStepX
+      const worldY = (col + row) * this.isoStepY
 
-        // Center the texture on the tile position (no offsets here)
-        const tileX = worldX - texture.width / 2
-        const tileY = worldY - texture.height / 2
+      // Center the texture on the tile position (no offsets here)
+      const tileX = worldX - texture.width / 2
+      const tileY = worldY - texture.height / 2
 
-        // Add tile to tilemap at pure world coordinates
-        this.tilemap.tile(texture, tileX, tileY)
+      // Debug: log tiles around the problem area
+      if (col === 0 && row >= -51 && row <= -45) {
+        console.log(`🔴 Tile(${col},${row}): worldY=${worldY.toFixed(2)}, tileY=${tileY.toFixed(2)}`)
+      }
 
-        // Add red debug box around the actual texture placement
-        const debugBox = new Graphics()
-        debugBox.x = worldX
-        debugBox.y = worldY
-        debugBox.rect(
-          -texture.width / 2,
-          -texture.height / 2,
-          texture.width,
-          texture.height
-        )
-        debugBox.stroke({ width: 2, color: 0xff0000 })
-        //this.overlaysContainer.addChild(debugBox)
+      // Add tile to tilemap at pure world coordinates
+      this.tilemap.tile(texture, tileX, tileY)
 
-        // Create hit area for interaction
-        const hitArea = new Graphics()
-        hitArea.alpha = 1  // Make visible for debugging
-        hitArea.eventMode = 'static'
-        hitArea.x = worldX
-        hitArea.y = worldY
+      // Add red debug box around the actual texture placement
+      const debugBox = new Graphics()
+      debugBox.x = worldX
+      debugBox.y = worldY
+      debugBox.rect(
+        -texture.width / 2,
+        -texture.height / 2,
+        texture.width,
+        texture.height
+      )
+      debugBox.stroke({ width: 2, color: 0xff0000 })
+      //this.overlaysContainer.addChild(debugBox)
 
-        // Hit polygon centered at origin (will be offset by hitArea.x/y)
-        const hitPolygon = new Polygon([
-          0, -this.isoStepY,
-          this.isoStepX, 0,
-          0, this.isoStepY,
-          -this.isoStepX, 0
-        ])
+      // Create hit area for interaction
+      const hitArea = new Graphics()
+      hitArea.alpha = 1  // Make visible for debugging
+      hitArea.eventMode = 'static'
+      hitArea.x = worldX
+      hitArea.y = worldY
 
-        hitArea.hitArea = hitPolygon
+      // Hit polygon centered at origin (will be offset by hitArea.x/y)
+      const hitPolygon = new Polygon([
+        0, -this.isoStepY,
+        this.isoStepX, 0,
+        0, this.isoStepY,
+        -this.isoStepX, 0
+      ])
 
-        // Draw the hitbox polygon visibly for debugging
-        hitArea.poly(hitPolygon.points)
-        //hitArea.fill({ color: 0x00ff00, alpha: 0.3 })
-        //hitArea.stroke({ width: 2, color: 0x00ff00 })
+      hitArea.hitArea = hitPolygon
 
-        this.overlaysContainer.addChild(hitArea)
-        hitAreas.push(hitArea)
+      // Draw the hitbox polygon visibly for debugging
+      hitArea.poly(hitPolygon.points)
+      //hitArea.fill({ color: 0x00ff00, alpha: 0.3 })
+      //hitArea.stroke({ width: 2, color: 0x00ff00 })
 
-        if (hitAreas.length === 1) {
-          console.log(`First tile added to chunk ${chunkX},${chunkY}`)
-        }
+      this.overlaysContainer.addChild(hitArea)
+      hitAreas.push(hitArea)
 
-        // Add tile interaction to GridManager
-        if (this.gridManager) {
-          this.gridManager.addTileInteraction(hitArea, col, row, this.debugMode)
-          coordinates.push({ col, row })
-        }
+      if (hitAreas.length === 1) {
+        console.log(`First tile added to chunk ${chunkX},${chunkY}`)
+      }
+
+      // Add tile interaction to GridManager
+      if (this.gridManager) {
+        this.gridManager.addTileInteraction(hitArea, col, row, this.debugMode)
+        coordinates.push({ col, row })
       }
     }
 
@@ -271,6 +282,12 @@ export class ChunkManager {
     const maxChunkX = maxChunk.chunkX + this.RENDER_DISTANCE
     const maxChunkY = maxChunk.chunkY + this.RENDER_DISTANCE
 
+    // Debug: log viewport and chunk range when viewing problem area
+    if (viewportCenterY < -2500 && viewportCenterY > -2800) {
+      console.log(`📊 Viewport center: (${viewportCenterX.toFixed(0)}, ${viewportCenterY.toFixed(0)}), tiles: (${topLeft.col},${topLeft.row}) to (${bottomRight.col},${bottomRight.row})`)
+      console.log(`📊 Loading chunks: X[${minChunkX} to ${maxChunkX}], Y[${minChunkY} to ${maxChunkY}]`)
+    }
+
     // Track which chunks should be loaded
     const chunksToKeep = new Set<string>()
     let needsRebuild = false
@@ -326,6 +343,9 @@ export class ChunkManager {
   private rebuildTilemap(): void {
     this.tilemap.clear()
 
+    // Collect all tiles from all chunks for proper z-ordering
+    const allTilesToRender: Array<{ col: number; row: number; depth: number; variant: TileVariant; chunkX: number; chunkY: number }> = []
+
     for (const [key] of this.chunks.entries()) {
       const [chunkX, chunkY] = key.split(',').map(Number)
       const { tileVariants } = this.terrainGenerator.generateChunkTerrain(chunkX, chunkY, this.CHUNK_SIZE)
@@ -340,22 +360,36 @@ export class ChunkManager {
           if (!this.shouldRenderTile(col, row)) continue
 
           const tileKey = `${col},${row}`
-          const variant = tileVariants.get(tileKey) || 'grass'
-          const texture = this.tileTextures.get(variant)
+          const variant = (tileVariants.get(tileKey) || 'grass') as TileVariant
+          const depth = col + row
 
-          if (!texture) continue
-
-          // Position in pure world coordinates
-          const worldX = (col - row) * this.isoStepX
-          const worldY = (col + row) * this.isoStepY
-
-          // Center the texture on the tile position
-          const tileX = worldX - texture.width / 2
-          const tileY = worldY - texture.height / 2
-
-          this.tilemap.tile(texture, tileX, tileY)
+          allTilesToRender.push({ col, row, depth, variant, chunkX, chunkY })
         }
       }
+    }
+
+    // Sort all tiles by depth (back to front) for proper z-ordering
+    allTilesToRender.sort((a, b) => a.depth - b.depth)
+
+    // Render tiles in sorted order
+    for (const { col, row, variant } of allTilesToRender) {
+      const texture = this.tileTextures.get(variant)
+      if (!texture) continue
+
+      // Position in pure world coordinates
+      const worldX = (col - row) * this.isoStepX
+      const worldY = (col + row) * this.isoStepY
+
+      // Center the texture on the tile position
+      const tileX = worldX - texture.width / 2
+      const tileY = worldY - texture.height / 2
+
+      // Debug: log tiles around the problem area during rebuild
+      if (col === 0 && row >= -51 && row <= -45) {
+        console.log(`🔴 REBUILD Tile(${col},${row}): worldY=${worldY.toFixed(2)}, tileY=${tileY.toFixed(2)}`)
+      }
+
+      this.tilemap.tile(texture, tileX, tileY)
     }
   }
 

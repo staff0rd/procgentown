@@ -141,15 +141,6 @@ export class GridManager {
     const worldX = (col - row) * this.isoStepX
     const worldY = (col + row) * this.isoStepY
 
-    // Create a blue box for debugging - positioned at tile center
-    const debugBox = new Graphics()
-    debugBox.rect(-20, -10, 40, 20)
-    debugBox.fill({ color: 0x0000ff, alpha: 0.3 })
-    debugBox.stroke({ color: 0x0000ff, width: 2 })
-    debugBox.x = worldX
-    debugBox.y = worldY
-    this.worldContainer.addChild(debugBox)
-
     const coordText = new Text({
       text: `${col},${row}`,
       style: {
