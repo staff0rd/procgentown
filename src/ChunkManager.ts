@@ -59,13 +59,11 @@ export class ChunkManager {
     // Create CompositeTilemap for efficient tile rendering
     this.tilemap = new CompositeTilemap()
     worldContainer.addChild(this.tilemap)
-    console.log('Created CompositeTilemap, children count:', worldContainer.children.length)
 
     // Create a separate container for overlays (above tiles)
     this.overlaysContainer = new Container()
     this.overlaysContainer.sortableChildren = true
     worldContainer.addChild(this.overlaysContainer)
-    console.log('Created overlaysContainer, children count:', worldContainer.children.length)
 
     // Calculate isometric steps using tile overlap
     this.isoStepX = (this.tileContentWidth - tileOverlap) / 2
@@ -106,8 +104,6 @@ export class ChunkManager {
     const endCol = startCol + this.CHUNK_SIZE
     const endRow = startRow + this.CHUNK_SIZE
 
-    console.log(`🔷 Generating chunk (${chunkX}, ${chunkY}): tiles (${startCol},${startRow}) to (${endCol-1},${endRow-1})`)
-
     // Collect tiles first for proper z-ordering
     const tilesToRender: Array<{ col: number; row: number; depth: number }> = []
     for (let row = startRow; row < endRow; row++) {
@@ -139,11 +135,6 @@ export class ChunkManager {
       // Center the texture on the tile position (no offsets here)
       const tileX = worldX - texture.width / 2
       const tileY = worldY - texture.height / 2
-
-      // Debug: log tiles around the problem area
-      if (col === 0 && row >= -51 && row <= -45) {
-        console.log(`🔴 Tile(${col},${row}): worldY=${worldY.toFixed(2)}, tileY=${tileY.toFixed(2)}`)
-      }
 
       // Add tile to tilemap at pure world coordinates
       this.tilemap.tile(texture, tileX, tileY)
@@ -185,10 +176,6 @@ export class ChunkManager {
 
       this.overlaysContainer.addChild(hitArea)
       hitAreas.push(hitArea)
-
-      if (hitAreas.length === 1) {
-        console.log(`First tile added to chunk ${chunkX},${chunkY}`)
-      }
 
       // Add tile interaction to GridManager
       if (this.gridManager) {
@@ -281,12 +268,6 @@ export class ChunkManager {
     const minChunkY = minChunk.chunkY - this.RENDER_DISTANCE
     const maxChunkX = maxChunk.chunkX + this.RENDER_DISTANCE
     const maxChunkY = maxChunk.chunkY + this.RENDER_DISTANCE
-
-    // Debug: log viewport and chunk range when viewing problem area
-    if (viewportCenterY < -2500 && viewportCenterY > -2800) {
-      console.log(`📊 Viewport center: (${viewportCenterX.toFixed(0)}, ${viewportCenterY.toFixed(0)}), tiles: (${topLeft.col},${topLeft.row}) to (${bottomRight.col},${bottomRight.row})`)
-      console.log(`📊 Loading chunks: X[${minChunkX} to ${maxChunkX}], Y[${minChunkY} to ${maxChunkY}]`)
-    }
 
     // Track which chunks should be loaded
     const chunksToKeep = new Set<string>()
@@ -383,11 +364,6 @@ export class ChunkManager {
       // Center the texture on the tile position
       const tileX = worldX - texture.width / 2
       const tileY = worldY - texture.height / 2
-
-      // Debug: log tiles around the problem area during rebuild
-      if (col === 0 && row >= -51 && row <= -45) {
-        console.log(`🔴 REBUILD Tile(${col},${row}): worldY=${worldY.toFixed(2)}, tileY=${tileY.toFixed(2)}`)
-      }
 
       this.tilemap.tile(texture, tileX, tileY)
     }

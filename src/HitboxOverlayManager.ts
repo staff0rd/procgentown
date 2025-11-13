@@ -8,7 +8,6 @@ export class HitboxOverlayManager {
   private isoStepX: number
   private isoStepY: number
   private isGridVisible: boolean = false
-  private lastLoggedTile: string | null = null
 
   constructor(
     container: Container,
@@ -72,12 +71,6 @@ export class HitboxOverlayManager {
       }
     }
 
-    // Log only when tile changes
-    if (this.lastLoggedTile !== tileKey) {
-      console.log(`Tile coordinate: ${tileKey}`)
-      this.lastLoggedTile = tileKey
-    }
-
     this.currentHoveredTile = tileKey
   }
 
@@ -88,7 +81,6 @@ export class HitboxOverlayManager {
     }
     if (this.currentHoveredTile === tileKey) {
       this.currentHoveredTile = null
-      this.lastLoggedTile = null
     }
   }
 

@@ -42,7 +42,6 @@ function App() {
 
     const initApp = async () => {
       if (pixiManagerRef.current) {
-        console.log('App initialization already completed, skipping')
         return
       }
 
@@ -51,7 +50,6 @@ function App() {
         await pixiManager.initialize(divRef.current!)
 
         if (isCancelled) {
-          console.log('Initialization was cancelled, cleaning up')
           pixiManager.destroy()
           return
         }
@@ -70,8 +68,6 @@ function App() {
             if (chunkManager) {
               const terrainGen = chunkManager.getTerrainGenerator()
               terrainGen.toggleSmoothing()
-              const smoothingState = terrainGen.isSmoothing() ? 'ON' : 'OFF'
-              console.log(`Water tile smoothing: ${smoothingState}`)
               chunkManager.regenerateAllChunks()
             }
           },
@@ -79,16 +75,12 @@ function App() {
             const gridManager = gridManagerRef.current
             if (gridManager) {
               gridManager.toggle()
-              const gridState = gridManager.isVisible() ? 'ON' : 'OFF'
-              console.log(`Grid visibility: ${gridState}`)
             }
           },
           onToggleTiles: () => {
             const chunkManager = chunkManagerRef.current
             if (chunkManager) {
               chunkManager.toggleTileVisibility()
-              const tilesState = chunkManager.areTilesVisible() ? 'ON' : 'OFF'
-              console.log(`Tile visibility: ${tilesState}`)
             }
           },
           getCurrentTile: () => {
@@ -188,9 +180,6 @@ function App() {
         chunkManager.setGridManager(gridManager)
 
         updateChunks()
-
-        console.log('Chunk-based infinite world created')
-        console.log('World children count:', world.children.length)
       } catch (error) {
         console.error('Failed to load textures:', error)
       }

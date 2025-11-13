@@ -26,14 +26,11 @@ export class PixiAppManager {
     // Clear the div and add canvas
     parentElement.innerHTML = ''
     parentElement.appendChild(app.canvas)
-    console.log('Canvas added, dimensions:', app.canvas.width, 'x', app.canvas.height)
-    console.log('Canvas style:', app.canvas.style.cssText)
 
     // Create world container
     const world = new Container()
     this.world = world
     app.stage.addChild(world)
-    console.log('World container added to stage, stage children:', app.stage.children.length)
 
     // Initialize camera manager with proper pivot/position transform
     this.cameraManager = new CameraManager(world, window.innerWidth, window.innerHeight)
@@ -42,8 +39,6 @@ export class PixiAppManager {
     const debugOverlay = new Container()
     this.debugOverlay = debugOverlay
     app.stage.addChild(debugOverlay)
-
-    console.log('PixiJS app initialized with CameraManager')
   }
 
   setupResize(onResize?: () => void): void {

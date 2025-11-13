@@ -135,13 +135,7 @@ export class InteractionManager {
         }
       } else if (key === 'd') {
         if (this.callbacks.getCurrentTile) {
-          const currentTile = this.callbacks.getCurrentTile()
-          if (currentTile) {
-            const [a, b] = currentTile.split(',').map(Number)
-            const c = a + 3
-            const d = b + 3
-            console.log(`(${a},${b}) -> (${c},${d})`)
-          }
+          this.callbacks.getCurrentTile()
         }
       }
     }

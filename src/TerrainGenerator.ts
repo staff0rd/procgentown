@@ -273,30 +273,6 @@ export class TerrainGenerator {
       }
     }
 
-    if (chunkX === 0 && chunkY === 0) {
-      console.log('\nMap grid (0,0 to 4,4):')
-      console.log('Note: This is in GRID coordinates (col, row)')
-      console.log('The isometric visual display may show different positions')
-      let header = '  '
-      for (let col = 0; col <= 4; col++) {
-        header += ` ${col}`
-      }
-      console.log(header)
-      for (let row = 0; row <= 4; row++) {
-        let line = `${row}:`
-        for (let col = 0; col <= 4; col++) {
-          const type = mapData.get(col, row)
-          line += type === 'water' ? ' W' : ' G'
-        }
-        console.log(line)
-      }
-      console.log('\nDiagonal check (0,0 -> 1,1 -> 2,2 -> 3,3 -> 4,4):')
-      for (let i = 0; i <= 4; i++) {
-        const type = mapData.get(i, i)
-        const variant = tileVariants.get(`${i},${i}`)
-        console.log(`(${i},${i}): map=${type}, render=${variant}`)
-      }
-    }
 
     return { mapData, tileVariants }
   }
