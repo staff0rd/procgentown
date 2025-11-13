@@ -12,6 +12,6 @@ describe("TerrainGenerator", () => {
 		const terrainGen = new TerrainGenerator("procgentown");
 		const { mapData, tileVariants } = terrainGen.generateChunkTerrain(0, 0, 16);
 		expect(mapData.get(3, 1)).toBe("water");
-		expect(tileVariants.get("3,1")).toBe("grass_waterConcave_N");
+		expect(tileVariants.get("3,1")).toBe("grass_waterConcave_S");
 	});
 });

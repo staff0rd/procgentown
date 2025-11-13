@@ -33,6 +33,7 @@ export class HitboxOverlayManager {
 		]);
 		hitboxGraphics.fill({ color: 0xff0000, alpha: 0.3 });
 		hitboxGraphics.visible = false;
+		hitboxGraphics.eventMode = "none"; // Don't block click events
 
 		hitboxGraphics.x = sprite.x;
 		hitboxGraphics.y = sprite.y;

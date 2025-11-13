@@ -233,20 +233,20 @@ export class TerrainGenerator {
 
 		// Concave corners (2 adjacent sides water)
 		// The suffix indicates where the concave notch points (where grass curves in)
-		// grass_waterConcave_N: water on S+W, grass curves in from N
-		if (hasWaterS && hasWaterW && !hasWaterN && !hasWaterE) {
+		// grass_waterConcave_N: water on N+E, grass curves in from N
+		if (hasWaterN && hasWaterE && !hasWaterS && !hasWaterW) {
 			return "grass_waterConcave_N";
 		}
-		// grass_waterConcave_E: water on N+W, grass curves in from E
-		if (hasWaterN && hasWaterW && !hasWaterE && !hasWaterS) {
+		// grass_waterConcave_E: water on S+E, grass curves in from E
+		if (hasWaterS && hasWaterE && !hasWaterW && !hasWaterN) {
 			return "grass_waterConcave_E";
 		}
-		// grass_waterConcave_S: water on N+E, grass curves in from S
-		if (hasWaterN && hasWaterE && !hasWaterS && !hasWaterW) {
+		// grass_waterConcave_S: water on S+W, grass curves in from S
+		if (hasWaterS && hasWaterW && !hasWaterN && !hasWaterE) {
 			return "grass_waterConcave_S";
 		}
-		// grass_waterConcave_W: water on S+E, grass curves in from W
-		if (hasWaterS && hasWaterE && !hasWaterW && !hasWaterN) {
+		// grass_waterConcave_W: water on N+W, grass curves in from W
+		if (hasWaterN && hasWaterW && !hasWaterE && !hasWaterS) {
 			return "grass_waterConcave_W";
 		}
 

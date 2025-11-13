@@ -2,11 +2,13 @@ import { CompositeTilemap } from "@pixi/tilemap";
 import { Container, Graphics, Polygon, type Texture } from "pixi.js";
 import { RENDER_AXES_ONLY, RENDER_MINIMAL_TILES } from "./config";
 import type { GridManager } from "./GridManager";
+import type { MapData, MapTileType } from "./MapData";
 import type { TileVariant } from "./TerrainGenerator";
 import { TerrainGenerator } from "./TerrainGenerator";
 
 export class ChunkManager {
-	private chunks: Map<string, { hitAreas: Graphics[] }> = new Map();
+	private chunks: Map<string, { hitAreas: Graphics[]; mapData: MapData }> =
+		new Map();
 	private chunkCoordinates: Map<string, Array<{ col: number; row: number }>> =
 		new Map();
 	private tilemap: CompositeTilemap;
@@ -108,15 +110,16 @@ export class ChunkManager {
 	private generateChunk(
 		chunkX: number,
 		chunkY: number,
-	): { hitAreas: Graphics[] } {
+	): { hitAreas: Graphics[]; mapData: MapData } {
 		const hitAreas: Graphics[] = [];
 		const coordinates: Array<{ col: number; row: number }> = [];
 
-		const { tileVariants } = this.terrainGenerator.generateChunkTerrain(
-			chunkX,
-			chunkY,
-			this.CHUNK_SIZE,
-		);
+		const { mapData, tileVariants } =
+			this.terrainGenerator.generateChunkTerrain(
+				chunkX,
+				chunkY,
+				this.CHUNK_SIZE,
+			);
 
 		const startCol = chunkX * this.CHUNK_SIZE;
 		const startRow = chunkY * this.CHUNK_SIZE;
@@ -176,6 +179,7 @@ export class ChunkManager {
 			const hitArea = new Graphics();
 			hitArea.alpha = 1; // Make visible for debugging
 			hitArea.eventMode = "static";
+			hitArea.cursor = "pointer";
 			hitArea.x = worldX;
 			hitArea.y = worldY;
 
@@ -198,10 +202,15 @@ export class ChunkManager {
 			//hitArea.fill({ color: 0x00ff00, alpha: 0.3 })
 			//hitArea.stroke({ width: 2, color: 0x00ff00 })
 
+			// Attach click handler directly to hitArea
+			hitArea.on("click", () => {
+				this.handleTileClick(col, row);
+			});
+
 			this.overlaysContainer.addChild(hitArea);
 			hitAreas.push(hitArea);
 
-			// Add tile interaction to GridManager
+			// Add tile interaction to GridManager (for hover overlay)
 			if (this.gridManager) {
 				this.gridManager.addTileInteraction(hitArea, col, row, this.debugMode);
 				coordinates.push({ col, row });
@@ -214,7 +223,57 @@ export class ChunkManager {
 			this.chunkCoordinates.set(chunkKey, coordinates);
 		}
 
-		return { hitAreas };
+		return { hitAreas, mapData };
+	}
+
+	/**
+	 * Get tile type at a specific position (queries across chunks)
+	 */
+	private getTileType(col: number, row: number): MapTileType | undefined {
+		const { chunkX, chunkY } = this.tileToChunk(col, row);
+		const chunkKey = this.getChunkKey(chunkX, chunkY);
+		const chunk = this.chunks.get(chunkKey);
+		if (!chunk) return undefined;
+		return chunk.mapData.get(col, row);
+	}
+
+	/**
+	 * Handle tile click - display 3x3 grid of base tile types
+	 */
+	private handleTileClick(col: number, row: number): void {
+		const lines: string[] = [];
+
+		// Add clicked tile coordinate
+		lines.push(`Clicked tile: (${col}, ${row})`);
+		lines.push(""); // Empty line for spacing
+
+		// Calculate max width needed for row labels
+		const minRow = row - 1;
+		const maxRow = row + 1;
+		const rowLabelWidth = Math.max(
+			String(minRow).length,
+			String(maxRow).length,
+		);
+
+		// Build header with column numbers
+		const colLabels = [col - 1, col, col + 1].map((c) => String(c).padStart(3));
+		const header = `${" ".repeat(rowLabelWidth + 1)}${colLabels.join(" ")}`;
+		lines.push(header);
+
+		// Build each row
+		for (let r = minRow; r <= maxRow; r++) {
+			const rowLabel = String(r).padStart(rowLabelWidth);
+			let line = `${rowLabel} `;
+			for (let c = col - 1; c <= col + 1; c++) {
+				const tileType = this.getTileType(c, r);
+				const char =
+					tileType === "water" ? "W" : tileType === "grass" ? "G" : "?";
+				line += `${char.padStart(3)} `;
+			}
+			lines.push(line);
+		}
+
+		console.log(`\n${lines.join("\n")}`);
 	}
 
 	/**
