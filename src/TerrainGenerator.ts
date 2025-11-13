@@ -14,7 +14,11 @@ export type TileVariant =
 	| "grass_waterConcave_E"
 	| "grass_waterConcave_S"
 	| "grass_waterConcave_W"
-	| "grass_waterConvex_NS";
+	| "grass_waterConvex_NS"
+	| "grass_riverEnd_N"
+	| "grass_riverEnd_E"
+	| "grass_riverEnd_S"
+	| "grass_riverEnd_W";
 
 export interface ChunkTerrainResult {
 	mapData: MapData;
@@ -212,6 +216,14 @@ export class TerrainGenerator {
 			Boolean,
 		).length;
 
+		// River ends: water on only 1 side, grass on all other 3 sides
+		if (waterCount === 1) {
+			if (hasWaterN) return "grass_riverEnd_N";
+			if (hasWaterE) return "grass_riverEnd_E";
+			if (hasWaterS) return "grass_riverEnd_S";
+			if (hasWaterW) return "grass_riverEnd_W";
+		}
+
 		// If surrounded by water on all sides, check diagonals for convex corners
 		if (waterCount === 4) {
 			// Check diagonal neighbors
@@ -233,16 +245,16 @@ export class TerrainGenerator {
 		// Straight edges (3 sides water, 1 side grass)
 		// grass_water_E means grass on East, water on N, W, S
 		if (!hasWaterE && hasWaterN && hasWaterW && hasWaterS) {
-			return "grass_water_E";
-		}
-		if (!hasWaterS && hasWaterE && hasWaterN && hasWaterW) {
 			return "grass_water_S";
 		}
-		if (!hasWaterW && hasWaterE && hasWaterS && hasWaterN) {
+		if (!hasWaterS && hasWaterE && hasWaterN && hasWaterW) {
 			return "grass_water_W";
 		}
-		if (!hasWaterN && hasWaterE && hasWaterS && hasWaterW) {
+		if (!hasWaterW && hasWaterE && hasWaterS && hasWaterN) {
 			return "grass_water_N";
+		}
+		if (!hasWaterN && hasWaterE && hasWaterS && hasWaterW) {
+			return "grass_water_E";
 		}
 
 		// Concave corners (2 adjacent sides water)

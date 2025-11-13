@@ -40,6 +40,10 @@ export class ChunkManager {
 			grass_waterConcave_S: Texture;
 			grass_waterConcave_W: Texture;
 			grass_waterConvex_NS: Texture;
+			grass_riverEnd_N: Texture;
+			grass_riverEnd_E: Texture;
+			grass_riverEnd_S: Texture;
+			grass_riverEnd_W: Texture;
 		},
 		tileOverlap: number,
 		seed: string = "procgentown",
@@ -75,6 +79,10 @@ export class ChunkManager {
 			"grass_waterConvex_NS",
 			edgeTextures.grass_waterConvex_NS,
 		);
+		this.tileTextures.set("grass_riverEnd_N", edgeTextures.grass_riverEnd_N);
+		this.tileTextures.set("grass_riverEnd_E", edgeTextures.grass_riverEnd_E);
+		this.tileTextures.set("grass_riverEnd_S", edgeTextures.grass_riverEnd_S);
+		this.tileTextures.set("grass_riverEnd_W", edgeTextures.grass_riverEnd_W);
 
 		// Create CompositeTilemap for efficient tile rendering
 		this.tilemap = new CompositeTilemap();

@@ -1,6 +1,10 @@
 import { Assets, type Texture } from "pixi.js";
 
 import grassCenterE from "/tiles/grass_center_E.png";
+import grassRiverEndE from "/tiles/grass_riverEnd_E.png";
+import grassRiverEndN from "/tiles/grass_riverEnd_N.png";
+import grassRiverEndS from "/tiles/grass_riverEnd_S.png";
+import grassRiverEndW from "/tiles/grass_riverEnd_W.png";
 import grassWaterE from "/tiles/grass_water_E.png";
 import grassWaterN from "/tiles/grass_water_N.png";
 import grassWaterS from "/tiles/grass_water_S.png";
@@ -25,6 +29,10 @@ export interface TerrainTextures {
 		grass_waterConcave_S: Texture;
 		grass_waterConcave_W: Texture;
 		grass_waterConvex_NS: Texture;
+		grass_riverEnd_N: Texture;
+		grass_riverEnd_E: Texture;
+		grass_riverEnd_S: Texture;
+		grass_riverEnd_W: Texture;
 	};
 }
 
@@ -41,6 +49,10 @@ export async function loadTerrainTextures(): Promise<TerrainTextures> {
 		grassWaterConcaveSTexture,
 		grassWaterConcaveWTexture,
 		grassWaterConvexNSTexture,
+		grassRiverEndNTexture,
+		grassRiverEndETexture,
+		grassRiverEndSTexture,
+		grassRiverEndWTexture,
 	] = await Promise.all([
 		Assets.load(grassCenterE),
 		Assets.load(waterCenterE),
@@ -53,6 +65,10 @@ export async function loadTerrainTextures(): Promise<TerrainTextures> {
 		Assets.load(grassWaterConcaveS),
 		Assets.load(grassWaterConcaveW),
 		Assets.load(grassWaterConvexNS),
+		Assets.load(grassRiverEndN),
+		Assets.load(grassRiverEndE),
+		Assets.load(grassRiverEndS),
+		Assets.load(grassRiverEndW),
 	]);
 
 	return {
@@ -68,6 +84,10 @@ export async function loadTerrainTextures(): Promise<TerrainTextures> {
 			grass_waterConcave_S: grassWaterConcaveSTexture,
 			grass_waterConcave_W: grassWaterConcaveWTexture,
 			grass_waterConvex_NS: grassWaterConvexNSTexture,
+			grass_riverEnd_N: grassRiverEndNTexture,
+			grass_riverEnd_E: grassRiverEndETexture,
+			grass_riverEnd_S: grassRiverEndSTexture,
+			grass_riverEnd_W: grassRiverEndWTexture,
 		},
 	};
 }
